@@ -1,5 +1,7 @@
 # Chạy AI Video Studio trên máy mới
 
+Nếu dùng Cloudflare R2, điền nhóm biến `MEDIA_STORAGE` và `R2_*` trong `.env` trước khi build lại container. Có thể kiểm tra và đồng bộ media bằng `docker compose run --rm app npm run storage:check` và `docker compose run --rm app npm run storage:sync`.
+
 Yêu cầu Docker Desktop (hoặc Docker Engine + Compose), Internet và các API key cần dùng. Container gồm Node.js, Chromium cho Remotion, FFmpeg và PostgreSQL. Giao diện chỉ mở trên máy này tại `http://127.0.0.1:4173`.
 
 ## Cài mới

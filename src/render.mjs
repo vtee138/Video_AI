@@ -4,6 +4,7 @@ import {copyFile, link, mkdir, rm, stat, unlink} from 'node:fs/promises';
 import {bundle} from '@remotion/bundler';
 import {selectComposition, renderMedia} from '@remotion/renderer';
 import {root, outputDir, publicDir, slug} from './common.mjs';
+import {uploadLocalMedia} from './storage.mjs';
 
 export function isRetryableRemotionTempError(error) {
   const message = String(error?.message || error || '');
@@ -76,5 +77,6 @@ export async function renderVideo(spec, runId, onProgress, {cancelSignal} = {}) 
     await removeOwnedBundle(serveUrl);
   }
   if (!onProgress) process.stdout.write('\n');
+  await uploadLocalMedia(file);
   return file;
 }

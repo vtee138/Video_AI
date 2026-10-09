@@ -7,6 +7,7 @@ import {promisify} from 'node:util';
 import {Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {outputDir, root} from './common.mjs';
+import {uploadLocalMedia} from './storage.mjs';
 import {createFlowAsset, createFlowJob, getFlowAsset, getFlowJob,
   listFlowAssets, listFlowJobs, updateFlowJob} from './db.mjs';
 import {composeFlowVideo, openFlowBrowser, runFlowBrowser} from './flow-browser.mjs';
@@ -394,7 +395,9 @@ export async function handleFlowRequest(req, res, url, helpers) {
     await composeFlowVideo(parts, path.join(directory, 'video.mp4'), job.duration, directory);
     await mkdir(outputDir, {recursive: true});
     const outputName = `flow-${job.id}.mp4`;
-    await copyFile(path.join(directory, 'video.mp4'), path.join(outputDir, outputName));
+    const outputFile = path.join(outputDir, outputName);
+    await copyFile(path.join(directory, 'video.mp4'), outputFile);
+    await uploadLocalMedia(outputFile);
     if (auto.batch.previewOnly) {
       await updateFlowAutoItem(job.id, 'generating_video', {state: 'done', segment: index,
         outputName});

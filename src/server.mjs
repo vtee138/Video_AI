@@ -33,6 +33,7 @@ import {concurrencyConfig, Semaphore} from './concurrency.mjs';
 import {nextRunnableJobIndex, queueStatus} from './queue-control.mjs';
 import {handleFlowRequest} from './flow-tryon.mjs';
 import {watchFlowDownloads} from './flow-download-watch.mjs';
+import {deleteRemoteMedia, ensureLocalMedia, remoteMedia} from './storage.mjs';
 
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 4173);
@@ -671,7 +672,7 @@ async function startSuperCycle(campaign) {
 async function retrySuperItem(campaign, item) {
   try {
     if (item.outputName && item.targets) {
-      await stat(path.join(outputDir, item.outputName));
+      await ensureLocalMedia(path.join(outputDir, item.outputName));
       await updateSuperItem(item.id, {status: 'scheduled', error: null});
       void tickSuperAuto();
       return;
@@ -717,7 +718,7 @@ async function publishDueSuperItem(item) {
   for (const key of Object.keys(item.targets || {})) post.results[key] = {state: 'queued', progress: 0};
   let postSaved = false;
   try {
-    await stat(file);
+    await ensureLocalMedia(file);
     await savePost(post);
     postSaved = true;
     posts.set(post.id, post);
@@ -990,8 +991,32 @@ async function sendFile(res, file, contentType, rangeHeader) {
   createReadStream(file).pipe(res);
 }
 
+async function sendStoredFile(res, file, contentType, rangeHeader) {
+  try {
+    await sendFile(res, file, contentType, rangeHeader);
+    return;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const object = await remoteMedia(file, {range: rangeHeader});
+  if (!object?.Body) {
+    const error = new Error(`Không tìm thấy media: ${path.basename(file)}`);
+    error.code = 'ENOENT';
+    throw error;
+  }
+  const headers = {
+    'Content-Type': object.ContentType || contentType,
+    'Accept-Ranges': object.AcceptRanges || 'bytes',
+  };
+  if (object.ContentLength !== undefined) headers['Content-Length'] = object.ContentLength;
+  if (object.ContentRange) headers['Content-Range'] = object.ContentRange;
+  res.writeHead(object.ContentRange ? 206 : 200, headers);
+  await pipeline(object.Body, res);
+}
+
 async function thumbnailFor(outputName) {
   const video = path.join(outputDir, outputName);
+  await ensureLocalMedia(video);
   const videoInfo = await stat(video);
   const key = createHash('sha256').update(`${outputName}:${videoInfo.size}:${videoInfo.mtimeMs}`).digest('hex').slice(0, 24);
   const thumbnail = path.join(thumbnailDir, `${key}.jpg`);
@@ -1084,6 +1109,8 @@ async function removeVideo(outputName) {
   if (record.removeArtifacts) {
     cleanup.push(...await removeRunArtifacts([record.runId]));
   }
+  try { await deleteRemoteMedia(source); }
+  catch (error) { cleanup.push(`R2 ${outputName}: ${error.message}`); }
   return {cleanup};
 }
 
@@ -1175,7 +1202,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/output/')) {
       const name = path.basename(decodeURIComponent(url.pathname.slice('/output/'.length)));
       if (!name.endsWith('.mp4')) throw new Error('File video không hợp lệ.');
-      await sendFile(res, path.join(outputDir, name), 'video/mp4', req.headers.range);
+      await sendStoredFile(res, path.join(outputDir, name), 'video/mp4', req.headers.range);
       return;
     }
     if (req.method === 'GET' && url.pathname.startsWith('/thumbnails/') && url.pathname.endsWith('.jpg')) {
@@ -1232,6 +1259,7 @@ const server = createServer(async (req, res) => {
       const outputName = String(input.outputName || '');
       if (!/^[a-zA-Z0-9._-]+\.mp4$/.test(outputName)) throw new Error('Tên file MP4 không hợp lệ.');
       const file = path.join(outputDir, outputName);
+      await ensureLocalMedia(file);
       const info = await stat(file);
       if (!info.isFile() || !info.size) throw new Error('Không tìm thấy MP4 hoàn chỉnh.');
       const targets = input.targets;

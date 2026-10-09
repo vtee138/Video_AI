@@ -1,5 +1,18 @@
 # AI Video Studio
 
+## Lưu media trên Cloudflare R2
+
+Ứng dụng hỗ trợ Cloudflare R2 qua API tương thích S3. Video mới được upload lên R2 ngay sau khi render và vẫn có thể xem, tải hoặc đăng từ Thư viện nếu bản local đã được dọn. Bucket có thể để private vì trình duyệt đọc video qua server ứng dụng.
+
+Tạo một bucket và [API token R2](https://developers.cloudflare.com/r2/api/tokens/) có quyền **Object Read & Write** cho bucket đó. Điền các biến `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` trong `.env`, rồi đổi `MEDIA_STORAGE=r2`. Kiểm tra kết nối và đồng bộ toàn bộ video, ảnh, footage và âm thanh đang có:
+
+```powershell
+npm run storage:check
+npm run storage:sync
+```
+
+Lệnh đồng bộ có thể chạy lại: object có cùng kích thước và thời điểm sửa sẽ được bỏ qua. Bản local được giữ nguyên. Nếu đã kiểm tra dữ liệu trên R2 và muốn giải phóng dung lượng của các MP4 thành phẩm trong `output/`, đặt `R2_ALLOW_REMOVE_LOCAL_AFTER_SYNC=true` rồi chạy `npm run storage:sync:move`. Lệnh này chỉ xóa file trong `output/`; media nguồn trong `public/`, `assets/` và `.tmp/` vẫn được giữ để render và khôi phục job.
+
 **Chạy toàn bộ ứng dụng bằng Docker hoặc chuyển sang máy mới:** xem [DOCKER.md](DOCKER.md). Compose khởi động PostgreSQL, app và áp dụng migration tự động.
 
 ## Thử đồ với Google Flow

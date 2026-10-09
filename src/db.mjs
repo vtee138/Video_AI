@@ -7,6 +7,7 @@ import {withoutSourceAppendix} from './caption.mjs';
 import {publicationStatus} from './publication.mjs';
 import {summarizeSession} from './session.mjs';
 import {validateSuperFootageRepair, validateSuperRetry} from './super-auto.mjs';
+import {mediaReference} from './storage.mjs';
 export {publicationStatus} from './publication.mjs';
 
 const {Pool} = pg;
@@ -33,6 +34,13 @@ export async function migrateOnly() {
 
 export async function initDatabase() {
   await migrateOnly();
+  const storedVideos = await pool.query('SELECT output_name FROM videos');
+  for (const row of storedVideos.rows) {
+    const fallbackUrl = `/output/${encodeURIComponent(row.output_name)}`;
+    const storage = mediaReference(path.join(outputDir, row.output_name), {fallbackUrl});
+    await pool.query(`UPDATE videos SET storage_provider=$2, storage_key=$3, media_url=$4
+      WHERE output_name=$1`, [row.output_name, storage.provider, storage.key, storage.url]);
+  }
   await pool.query(`UPDATE flow_jobs SET state=CASE
       WHEN state IN ('generating_image', 'queued_image') THEN 'ready_image'
       ELSE 'ready_video' END,
@@ -410,15 +418,21 @@ export async function resumeSuperCampaign(id) {
 }
 
 export async function saveVideo(video, legacy = false) {
+  const fallbackUrl = `/output/${encodeURIComponent(video.outputName)}`;
+  const storage = mediaReference(path.join(outputDir, video.outputName), {fallbackUrl});
   await pool.query(`INSERT INTO videos
-    (output_name, run_id, title, caption, template, manual_publication, rendered_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    (output_name, run_id, title, caption, template, manual_publication, rendered_at,
+      storage_provider, storage_key, media_url)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT (output_name) DO UPDATE SET
       run_id = COALESCE(EXCLUDED.run_id, videos.run_id),
       title = EXCLUDED.title, caption = EXCLUDED.caption,
-      template = COALESCE(EXCLUDED.template, videos.template), updated_at = now()`,
+      template = COALESCE(EXCLUDED.template, videos.template),
+      storage_provider = EXCLUDED.storage_provider, storage_key = EXCLUDED.storage_key,
+      media_url = EXCLUDED.media_url, updated_at = now()`,
   [video.outputName, video.runId || null, video.title, video.caption || '', video.template || null,
-    legacy ? 'unknown' : 'not_posted', video.renderedAt || new Date().toISOString()]);
+    legacy ? 'unknown' : 'not_posted', video.renderedAt || new Date().toISOString(),
+    storage.provider, storage.key, storage.url]);
 }
 
 export async function saveJob(job) {
@@ -481,7 +495,8 @@ export async function activePostForOutput(outputName, platforms) {
 
 export async function listVideos(limit = null) {
   const {rows} = await pool.query(`SELECT output_name, run_id, title, caption, template,
-    manual_publication, rendered_at FROM videos ORDER BY rendered_at DESC${limit ? ' LIMIT $1' : ''}`,
+    manual_publication, rendered_at, storage_provider, storage_key, media_url
+    FROM videos ORDER BY rendered_at DESC${limit ? ' LIMIT $1' : ''}`,
   limit ? [limit] : []);
   if (!rows.length) return [];
   const {rows: postRows} = await pool.query(`SELECT id, output_name, source, results, created_at
@@ -495,7 +510,7 @@ export async function listVideos(limit = null) {
   return rows.map(row => {
     const posts = postsByOutput.get(row.output_name) || [];
     return {id: row.run_id || row.output_name, title: row.title, template: row.template,
-      status: 'done', outputUrl: `/output/${encodeURIComponent(row.output_name)}`,
+      status: 'done', outputUrl: row.media_url || `/output/${encodeURIComponent(row.output_name)}`,
       caption: row.caption, modifiedAt: row.rendered_at.toISOString(),
       manualPublication: row.manual_publication,
       publicationStatus: publicationStatus({manualPublication: row.manual_publication}, posts),
