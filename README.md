@@ -4,6 +4,8 @@
 
 Ứng dụng hỗ trợ Cloudflare R2 qua API tương thích S3. Video mới được upload lên R2 ngay sau khi render và vẫn có thể xem, tải hoặc đăng từ Thư viện nếu bản local đã được dọn. Bucket có thể để private vì trình duyệt đọc video qua server ứng dụng.
 
+Metadata của Thư viện được lưu thêm tại `R2_PREFIX/catalog/videos.json`. Khi chạy trên máy mới với PostgreSQL trống, ứng dụng tự tải catalog này và seed lại video, tiêu đề, caption, trạng thái đăng, object key và URL phát. Vì vậy chỉ cần chuyển mã nguồn cùng `.env`; không cần sao chép thư mục `output/`.
+
 Tạo một bucket và [API token R2](https://developers.cloudflare.com/r2/api/tokens/) có quyền **Object Read & Write** cho bucket đó. Điền các biến `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` trong `.env`, rồi đổi `MEDIA_STORAGE=r2`. Kiểm tra kết nối và đồng bộ toàn bộ video, ảnh, footage và âm thanh đang có:
 
 ```powershell

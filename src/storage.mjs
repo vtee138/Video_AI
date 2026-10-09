@@ -8,6 +8,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import {Upload} from '@aws-sdk/lib-storage';
@@ -181,6 +182,40 @@ export async function checkR2Connection() {
   const config = r2Config();
   await r2Client().send(new ListObjectsV2Command({Bucket: config.bucket, MaxKeys: 1}));
   return {bucket: config.bucket, prefix: config.prefix};
+}
+
+function videoCatalogKey(config) {
+  return config.prefix ? `${config.prefix}/catalog/videos.json` : 'catalog/videos.json';
+}
+
+export async function readVideoCatalog() {
+  if (!r2Enabled()) return null;
+  const config = r2Config();
+  try {
+    const object = await r2Client().send(new GetObjectCommand({
+      Bucket: config.bucket, Key: videoCatalogKey(config),
+    }));
+    if (!object.Body) return null;
+    const chunks = [];
+    for await (const chunk of object.Body) chunks.push(Buffer.from(chunk));
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch (error) {
+    const status = error?.$metadata?.httpStatusCode;
+    if (status === 404 || error?.name === 'NotFound' || error?.name === 'NoSuchKey') return null;
+    throw error;
+  }
+}
+
+export async function writeVideoCatalog(catalog) {
+  if (!r2Enabled()) return false;
+  const config = r2Config();
+  await r2Client().send(new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: videoCatalogKey(config),
+    Body: JSON.stringify(catalog),
+    ContentType: 'application/json; charset=utf-8',
+  }));
+  return true;
 }
 
 async function walk(directory, result) {

@@ -7,7 +7,7 @@ import {withoutSourceAppendix} from './caption.mjs';
 import {publicationStatus} from './publication.mjs';
 import {summarizeSession} from './session.mjs';
 import {validateSuperFootageRepair, validateSuperRetry} from './super-auto.mjs';
-import {mediaReference} from './storage.mjs';
+import {mediaReference, r2Enabled, readVideoCatalog, writeVideoCatalog} from './storage.mjs';
 export {publicationStatus} from './publication.mjs';
 
 const {Pool} = pg;
@@ -41,6 +41,8 @@ export async function initDatabase() {
     await pool.query(`UPDATE videos SET storage_provider=$2, storage_key=$3, media_url=$4
       WHERE output_name=$1`, [row.output_name, storage.provider, storage.key, storage.url]);
   }
+  if (storedVideos.rows.length) await syncVideoCatalog().catch(error =>
+    console.warn(`Không thể cập nhật catalog video trên R2: ${error.message}`));
   await pool.query(`UPDATE flow_jobs SET state=CASE
       WHEN state IN ('generating_image', 'queued_image') THEN 'ready_image'
       ELSE 'ready_video' END,
@@ -433,6 +435,26 @@ export async function saveVideo(video, legacy = false) {
   [video.outputName, video.runId || null, video.title, video.caption || '', video.template || null,
     legacy ? 'unknown' : 'not_posted', video.renderedAt || new Date().toISOString(),
     storage.provider, storage.key, storage.url]);
+  await syncVideoCatalog().catch(error => console.warn(`Không thể cập nhật catalog video trên R2: ${error.message}`));
+}
+
+export async function syncVideoCatalog() {
+  if (!r2Enabled()) return false;
+  const {rows} = await pool.query(`SELECT output_name, run_id, title, caption, template,
+    manual_publication, rendered_at, storage_provider, storage_key, media_url
+    FROM videos ORDER BY rendered_at`);
+  return writeVideoCatalog({version: 1, exportedAt: new Date().toISOString(), videos: rows.map(row => ({
+    outputName: row.output_name,
+    runId: row.run_id,
+    title: row.title,
+    caption: row.caption,
+    template: row.template,
+    manualPublication: row.manual_publication,
+    renderedAt: row.rendered_at.toISOString(),
+    storageProvider: row.storage_provider,
+    storageKey: row.storage_key,
+    mediaUrl: row.media_url,
+  }))});
 }
 
 export async function saveJob(job) {
@@ -626,6 +648,7 @@ export async function deleteVideoRecord(outputName) {
       step = 'Video đã xóa khỏi Thư viện', updated_at = now() WHERE output_name = $1`, [outputName]);
     await client.query('DELETE FROM videos WHERE output_name = $1', [outputName]);
     await client.query('COMMIT');
+    await syncVideoCatalog().catch(error => console.warn(`Không thể cập nhật catalog video trên R2: ${error.message}`));
     return {runId, removeArtifacts: Boolean(runId && !shared.length)};
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
@@ -639,8 +662,39 @@ async function readJson(file) {
 export async function seedExistingOutputs() {
   const {rows: deletedRows} = await pool.query('SELECT id FROM deleted_sessions');
   const deletedSessions = new Set(deletedRows.map(row => row.id));
-  const entries = await readdir(outputDir, {withFileTypes: true}).catch(() => []);
   let seededVideos = 0;
+  let seededJobs = 0;
+  const {rows: existingRows} = await pool.query('SELECT count(*)::integer AS total FROM videos');
+  if (!existingRows[0].total && r2Enabled()) {
+    try {
+      const catalog = await readVideoCatalog();
+      for (const video of catalog?.videos || []) {
+        if (!/^[a-zA-Z0-9._-]+\.mp4$/.test(video.outputName || '')) continue;
+        const fallbackUrl = `/output/${encodeURIComponent(video.outputName)}`;
+        const storage = mediaReference(path.join(outputDir, video.outputName), {fallbackUrl});
+        const {rowCount} = await pool.query(`INSERT INTO videos
+          (output_name, run_id, title, caption, template, manual_publication, rendered_at,
+            storage_provider, storage_key, media_url)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
+        [video.outputName, video.runId || null, video.title || video.outputName.replace(/\.mp4$/, ''),
+          video.caption || '', video.template || null,
+          ['unknown', 'not_posted', 'posted'].includes(video.manualPublication) ? video.manualPublication : 'unknown',
+          video.renderedAt || new Date().toISOString(), storage.provider, storage.key, storage.url]);
+        seededVideos += rowCount;
+        if (rowCount && video.runId && !deletedSessions.has(video.runId.replace(/-q\d+$/, ''))) {
+          const {rowCount: jobCount} = await pool.query(`INSERT INTO jobs
+            (run_id, parent_id, title, template, status, step, progress, output_name)
+            VALUES ($1,$2,$3,$4,'done','Khôi phục từ catalog R2',1,$5) ON CONFLICT DO NOTHING`,
+          [video.runId, /-q\d+$/.test(video.runId) ? video.runId.replace(/-q\d+$/, '') : null,
+            video.title || video.outputName.replace(/\.mp4$/, ''), video.template || 'ranking', video.outputName]);
+          seededJobs += jobCount;
+        }
+      }
+    } catch (error) {
+      console.warn(`Không thể seed thư viện từ catalog R2: ${error.message}`);
+    }
+  }
+  const entries = await readdir(outputDir, {withFileTypes: true}).catch(() => []);
   for (const entry of entries) {
     if (!entry.isFile() || !/^[a-zA-Z0-9._-]+\.mp4$/.test(entry.name)) continue;
     const file = path.join(outputDir, entry.name);
@@ -665,7 +719,6 @@ export async function seedExistingOutputs() {
     [runId, /-q\d+$/.test(runId) ? runId.replace(/-q\d+$/, '') : null,
       title, quote ? 'quote' : 'ranking', entry.name]);
   }
-  let seededJobs = 0;
   const folders = await readdir(path.join(root, '.tmp'), {withFileTypes: true}).catch(() => []);
   for (const entry of folders) {
     if (!entry.isDirectory() || !/^\d{4}-\d{2}-\d{2}T[\d-]+Z(?:-q\d+)?$/.test(entry.name) ||
