@@ -55,9 +55,13 @@ try {
       await docker(['exec', '-T', 'postgres', 'pg_restore', '-U', user, '-d', database,
         '--clean', '--if-exists', '--no-owner', '--no-privileges', '--exit-on-error'], {inputFile: temporary});
     } finally {
-      if (mainDatabase) await docker(['up', '-d', '--wait', 'app']);
+      if (mainDatabase) {
+        try { await docker(['up', '-d', 'app']); }
+        catch (error) { console.warn(`DB đã restore nhưng không thể khởi động app: ${error.message}`); }
+      }
     }
     console.log(`Đã restore toàn bộ PostgreSQL từ R2: ${backup.key}.`);
+    if (mainDatabase) console.log('Đã gửi lệnh khởi động app. Kiểm tra bằng: docker compose ps');
   } else {
     throw new Error('Cách dùng: node src/db-transfer.mjs backup|restore');
   }

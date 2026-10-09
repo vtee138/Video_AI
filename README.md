@@ -19,6 +19,8 @@ docker compose up -d postgres
 npm run db:restore:r2
 ```
 
+Chạy lệnh bằng user thường, không dùng `sudo npm`. Script dùng thư mục temp của hệ điều hành và chỉ chờ PostgreSQL; sau khi restore xong nó gửi lệnh khởi động app mà không biến lỗi health của app thành lỗi restore DB. Kiểm tra riêng bằng `docker compose ps` và `docker compose logs --tail=200 app`.
+
 Backup mới nhất nằm tại `R2_PREFIX/backups/postgres/latest.dump`; mỗi lần backup cũng tạo một bản có timestamp để khôi phục khi cần.
 
 Tạo một bucket và [API token R2](https://developers.cloudflare.com/r2/api/tokens/) có quyền **Object Read & Write** cho bucket đó. Điền các biến `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` trong `.env`, rồi đổi `MEDIA_STORAGE=r2`. Kiểm tra kết nối và đồng bộ toàn bộ video, ảnh, footage và âm thanh đang có:
