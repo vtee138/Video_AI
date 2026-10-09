@@ -1,8 +1,8 @@
 import {spawn} from 'node:child_process';
 import {createReadStream, createWriteStream} from 'node:fs';
-import {mkdir, stat, unlink} from 'node:fs/promises';
+import {mkdtemp, rm, stat} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {randomUUID} from 'node:crypto';
 import {pipeline} from 'node:stream/promises';
 import {root} from './common.mjs';
 import {downloadDatabaseBackup, uploadDatabaseBackup} from './storage.mjs';
@@ -30,8 +30,8 @@ async function docker(args, {inputFile = null, outputFile = null} = {}) {
   await Promise.all([closed, ...streams]);
 }
 
-await mkdir(path.join(root, '.tmp'), {recursive: true});
-const temporary = path.join(root, '.tmp', `postgres-${randomUUID()}.dump`);
+const temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'video-studio-postgres-'));
+const temporary = path.join(temporaryDirectory, 'database.dump');
 
 try {
   if (action === 'backup') {
@@ -62,5 +62,5 @@ try {
     throw new Error('Cách dùng: node src/db-transfer.mjs backup|restore');
   }
 } finally {
-  await unlink(temporary).catch(() => {});
+  await rm(temporaryDirectory, {recursive: true, force: true}).catch(() => {});
 }
