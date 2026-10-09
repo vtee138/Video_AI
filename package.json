@@ -8,6 +8,8 @@
     "flow:watch": "node src/flow-download-watch.mjs",
     "db:seed": "node src/seed.mjs",
     "db:migrate": "node src/migrate.mjs",
+    "db:backup:r2": "node src/db-transfer.mjs backup",
+    "db:restore:r2": "node src/db-transfer.mjs restore",
     "storage:check": "node src/r2-sync.mjs --check",
     "storage:sync": "node src/r2-sync.mjs",
     "storage:sync:move": "node src/r2-sync.mjs --remove-local",

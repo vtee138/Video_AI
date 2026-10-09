@@ -218,6 +218,40 @@ export async function writeVideoCatalog(catalog) {
   return true;
 }
 
+function databaseBackupKey(config, name = 'latest.dump') {
+  const relative = `backups/postgres/${name}`;
+  return config.prefix ? `${config.prefix}/${relative}` : relative;
+}
+
+export async function uploadDatabaseBackup(file, {name = 'latest.dump'} = {}) {
+  if (!r2Enabled()) throw new Error('Đặt MEDIA_STORAGE=r2 trước khi backup PostgreSQL.');
+  const config = r2Config();
+  const info = await stat(file);
+  if (!info.isFile() || !info.size) throw new Error('File backup PostgreSQL rỗng.');
+  const key = databaseBackupKey(config, name);
+  const upload = new Upload({
+    client: r2Client(),
+    params: {Bucket: config.bucket, Key: key, Body: createReadStream(file),
+      ContentLength: info.size, ContentType: 'application/octet-stream',
+      Metadata: {'created-at': new Date().toISOString()}},
+    queueSize: 2, partSize: 16 * 1024 * 1024, leavePartsOnError: false,
+  });
+  await upload.done();
+  return {key, size: info.size};
+}
+
+export async function downloadDatabaseBackup(file, {name = 'latest.dump'} = {}) {
+  if (!r2Enabled()) throw new Error('Đặt MEDIA_STORAGE=r2 trước khi restore PostgreSQL.');
+  const config = r2Config();
+  const object = await r2Client().send(new GetObjectCommand({
+    Bucket: config.bucket, Key: databaseBackupKey(config, name),
+  }));
+  if (!object.Body) throw new Error('Backup PostgreSQL trên R2 không có nội dung.');
+  await mkdir(path.dirname(file), {recursive: true});
+  await pipeline(object.Body, createWriteStream(file));
+  return {key: databaseBackupKey(config, name), size: object.ContentLength};
+}
+
 async function walk(directory, result) {
   const entries = await readdir(directory, {withFileTypes: true}).catch(error => {
     if (error.code === 'ENOENT') return [];

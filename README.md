@@ -6,6 +6,21 @@
 
 Metadata của Thư viện được lưu thêm tại `R2_PREFIX/catalog/videos.json`. Khi chạy trên máy mới với PostgreSQL trống, ứng dụng tự tải catalog này và seed lại video, tiêu đề, caption, trạng thái đăng, object key và URL phát. Vì vậy chỉ cần chuyển mã nguồn cùng `.env`; không cần sao chép thư mục `output/`.
 
+Để chuyển toàn bộ PostgreSQL, gồm video, job, lịch sử đăng, Super Auto và Flow, tạo bản backup R2 trước khi chuyển máy:
+
+```powershell
+npm run db:backup:r2
+```
+
+Trên máy mới, cấu hình `.env`, khởi động PostgreSQL rồi restore. Lệnh restore dừng app trong lúc thay dữ liệu và tự khởi động lại khi hoàn tất:
+
+```powershell
+docker compose up -d postgres
+npm run db:restore:r2
+```
+
+Backup mới nhất nằm tại `R2_PREFIX/backups/postgres/latest.dump`; mỗi lần backup cũng tạo một bản có timestamp để khôi phục khi cần.
+
 Tạo một bucket và [API token R2](https://developers.cloudflare.com/r2/api/tokens/) có quyền **Object Read & Write** cho bucket đó. Điền các biến `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` trong `.env`, rồi đổi `MEDIA_STORAGE=r2`. Kiểm tra kết nối và đồng bộ toàn bộ video, ảnh, footage và âm thanh đang có:
 
 ```powershell
