@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "AI Video Studio · Flow Try-on",
+  "version": "0.3.2",
+  "description": "Chạy hàng đợi thử đồ bằng Google Flow trong Edge đã đăng nhập.",
+  "permissions": ["downloads", "storage", "alarms", "scripting"],
+  "host_permissions": [
+    "https://flow.google.com/*",
+    "https://labs.google/*",
+    "http://127.0.0.1:4173/*"
+  ],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html", "default_title": "Flow Try-on"},
+  "content_scripts": [{
+    "matches": ["https://flow.google.com/*", "https://labs.google/*"],
+    "js": ["flow-content.js", "flow-auto-content.js"],
+    "run_at": "document_idle"
+  }]
+}

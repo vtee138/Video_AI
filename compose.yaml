@@ -1,0 +1,56 @@
+name: ai-video-studio
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-video_studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-video_studio}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - video_studio_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4173
+      RUNNING_IN_DOCKER: "1"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      FLOW_DOWNLOAD_DIR: /app/flow-downloads
+      REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:4173:4173"
+    volumes:
+      - ./output:/app/output
+      - ./.tmp:/app/.tmp
+      - ./.cache:/app/.cache
+      - ./public:/app/public
+      - ./assets:/app/assets
+      - ${FLOW_DOWNLOAD_HOST_DIR:-./.downloads/flow-tryon}:/app/flow-downloads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    shm_size: 1gb
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4173/', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  video_studio_pgdata:

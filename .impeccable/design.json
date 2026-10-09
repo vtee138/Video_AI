@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T16:31:41.4441781+07:00",
+  "title": "Design System: Ranking Studio",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Control Room",
+        "canonical": "#0d1117",
+        "tonalRamp": ["oklch(15% 0.014 250)", "oklch(26% 0.014 250)", "oklch(37% 0.014 250)", "oklch(49% 0.014 250)", "oklch(61% 0.014 250)", "oklch(73% 0.014 250)", "oklch(84% 0.014 250)", "oklch(95% 0.014 250)"]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Rundown Sheet",
+        "canonical": "#121821",
+        "tonalRamp": ["oklch(15% 0.018 250)", "oklch(26% 0.018 250)", "oklch(37% 0.018 250)", "oklch(49% 0.018 250)", "oklch(61% 0.018 250)", "oklch(73% 0.018 250)", "oklch(84% 0.018 250)", "oklch(95% 0.018 250)"]
+      },
+      "panel-raised": {
+        "role": "neutral",
+        "displayName": "Raised Instrument",
+        "canonical": "#171f29",
+        "tonalRamp": ["oklch(15% 0.020 250)", "oklch(26% 0.020 250)", "oklch(37% 0.020 250)", "oklch(49% 0.020 250)", "oklch(61% 0.020 250)", "oklch(73% 0.020 250)", "oklch(84% 0.020 250)", "oklch(95% 0.020 250)"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Rule Line",
+        "canonical": "#293440",
+        "tonalRamp": ["oklch(15% 0.022 245)", "oklch(26% 0.022 245)", "oklch(37% 0.022 245)", "oklch(49% 0.022 245)", "oklch(61% 0.022 245)", "oklch(73% 0.022 245)", "oklch(84% 0.022 245)", "oklch(95% 0.022 245)"]
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Strong Rule",
+        "canonical": "#3b4855",
+        "tonalRamp": ["oklch(15% 0.024 245)", "oklch(26% 0.024 245)", "oklch(37% 0.024 245)", "oklch(49% 0.024 245)", "oklch(61% 0.024 245)", "oklch(73% 0.024 245)", "oklch(84% 0.024 245)", "oklch(95% 0.024 245)"]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#f7f4ea",
+        "tonalRamp": ["oklch(15% 0.015 90)", "oklch(26% 0.015 90)", "oklch(37% 0.015 90)", "oklch(49% 0.015 90)", "oklch(61% 0.015 90)", "oklch(73% 0.015 90)", "oklch(84% 0.015 90)", "oklch(95% 0.015 90)"]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Slate Note",
+        "canonical": "#9aa8b6",
+        "tonalRamp": ["oklch(15% 0.024 245)", "oklch(26% 0.024 245)", "oklch(37% 0.024 245)", "oklch(49% 0.024 245)", "oklch(61% 0.024 245)", "oklch(73% 0.024 245)", "oklch(84% 0.024 245)", "oklch(95% 0.024 245)"]
+      },
+      "text-soft": {
+        "role": "neutral",
+        "displayName": "Soft Steel",
+        "canonical": "#c6d0d8",
+        "tonalRamp": ["oklch(15% 0.015 240)", "oklch(26% 0.015 240)", "oklch(37% 0.015 240)", "oklch(49% 0.015 240)", "oklch(61% 0.015 240)", "oklch(73% 0.015 240)", "oklch(84% 0.015 240)", "oklch(95% 0.015 240)"]
+      },
+      "accent-gold": {
+        "role": "primary",
+        "displayName": "Studio Gold",
+        "canonical": "#f2c94c",
+        "tonalRamp": ["oklch(15% 0.12 90)", "oklch(26% 0.12 90)", "oklch(37% 0.12 90)", "oklch(49% 0.12 90)", "oklch(61% 0.12 90)", "oklch(73% 0.12 90)", "oklch(84% 0.12 90)", "oklch(95% 0.12 90)"]
+      },
+      "accent-ink": {
+        "role": "neutral",
+        "displayName": "Gold Ink",
+        "canonical": "#171407",
+        "tonalRamp": ["oklch(15% 0.030 95)", "oklch(26% 0.030 95)", "oklch(37% 0.030 95)", "oklch(49% 0.030 95)", "oklch(61% 0.030 95)", "oklch(73% 0.030 95)", "oklch(84% 0.030 95)", "oklch(95% 0.030 95)"]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "Verified Mint",
+        "canonical": "#6bd39b",
+        "tonalRamp": ["oklch(15% 0.11 155)", "oklch(26% 0.11 155)", "oklch(37% 0.11 155)", "oklch(49% 0.11 155)", "oklch(61% 0.11 155)", "oklch(73% 0.11 155)", "oklch(84% 0.11 155)", "oklch(95% 0.11 155)"]
+      },
+      "error": {
+        "role": "secondary",
+        "displayName": "Signal Red",
+        "canonical": "#ff7b7b",
+        "tonalRamp": ["oklch(15% 0.13 25)", "oklch(26% 0.13 25)", "oklch(37% 0.13 25)", "oklch(49% 0.13 25)", "oklch(61% 0.13 25)", "oklch(73% 0.13 25)", "oklch(84% 0.13 25)", "oklch(95% 0.13 25)"]
+      },
+      "link": {
+        "role": "secondary",
+        "displayName": "Source Blue",
+        "canonical": "#83b9ff",
+        "tonalRamp": ["oklch(15% 0.10 255)", "oklch(26% 0.10 255)", "oklch(37% 0.10 255)", "oklch(49% 0.10 255)", "oklch(61% 0.10 255)", "oklch(73% 0.10 255)", "oklch(84% 0.10 255)", "oklch(95% 0.10 255)"]
+      }
+    },
+    "typographyMeta": {
+      "display": {"displayName": "Display", "purpose": "Current stage question and page-level task."},
+      "headline": {"displayName": "Headline", "purpose": "Stage titles and render status."},
+      "title": {"displayName": "Title", "purpose": "Brand, section names, and strong row labels."},
+      "body": {"displayName": "Body", "purpose": "Default reading copy and form input."},
+      "label": {"displayName": "Label", "purpose": "Metadata, table headers, tags, and counters."}
+    },
+    "shadows": [
+      {"name": "ambient-panel", "value": "0 18px 50px rgba(0,0,0,.28)", "purpose": "Optional broad lift for a visually independent output surface."},
+      {"name": "preview-lift", "value": "0 24px 55px rgba(0,0,0,.34)", "purpose": "Separates the 9:16 video preview from the preview rail."},
+      {"name": "status-halo", "value": "0 0 0 4px rgba(107,211,155,.12)", "purpose": "Semantic halo around ready-state dots; tint it to match error or neutral states."}
+    ],
+    "motion": [
+      {"name": "control-fast", "value": "160ms ease", "purpose": "Button, row, and idea-option hover response."},
+      {"name": "navigation", "value": "180ms ease", "purpose": "Workflow and field border state changes."},
+      {"name": "stage-enter", "value": "200ms cubic-bezier(.2,.8,.2,1)", "purpose": "Small fade and five-pixel rise when a stage becomes active."},
+      {"name": "progress", "value": "250ms ease", "purpose": "Progress fill updates without abrupt jumps."},
+      {"name": "skeleton-pass", "value": "1250ms ease", "purpose": "Two shimmer passes during loading."},
+      {"name": "reduced-motion", "value": "0.01ms", "purpose": "Near-instant fallback when the user prefers reduced motion."}
+    ],
+    "breakpoints": [
+      {"name": "preview-collapse", "value": "1180px"},
+      {"name": "mobile", "value": "760px"}
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Advances the current production stage; use once per local action region.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\"><path d=\"M5 12h14M14 7l5 5-5 5\"/></svg>Tạo góc nội dung</button>",
+      "css": ".ds-btn-primary{min-height:43px;padding:0 17px;border:1px solid var(--gold,#f2c94c);border-radius:10px;background:var(--gold,#f2c94c);color:var(--gold-dark,#171407);display:inline-flex;align-items:center;justify-content:center;gap:9px;font-family:'Be Vietnam Pro',Arial,sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:transform .16s ease,background-color .16s ease,border-color .16s ease}.ds-btn-primary svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-btn-primary:hover{transform:translateY(-1px);background:#ffda61;border-color:#ffda61}.ds-btn-primary:active{transform:translateY(0)}.ds-btn-primary:focus-visible{outline:3px solid rgba(242,201,76,.9);outline-offset:3px}.ds-btn-primary:disabled{opacity:.44;cursor:not-allowed;transform:none}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary action for reversible navigation and starting a new run.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\"><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\"><path d=\"M12 5v14M5 12h14\"/></svg>Phiên mới</button>",
+      "css": ".ds-btn-ghost{min-height:43px;padding:0 17px;border:1px solid var(--line-strong,#3b4855);border-radius:10px;background:transparent;color:var(--ink,#f7f4ea);display:inline-flex;align-items:center;justify-content:center;gap:9px;font-family:'Be Vietnam Pro',Arial,sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:transform .16s ease,background-color .16s ease,border-color .16s ease}.ds-btn-ghost svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ds-btn-ghost:hover{transform:translateY(-1px);background:#222d39;border-color:#526170}.ds-btn-ghost:active{transform:translateY(0)}.ds-btn-ghost:focus-visible{outline:3px solid rgba(242,201,76,.9);outline-offset:3px}"
+    },
+    {
+      "name": "Prompt Field",
+      "kind": "input",
+      "refersTo": "prompt-field",
+      "description": "Unified topic-entry surface with textarea, character count, and stage action.",
+      "html": "<label class=\"ds-prompt-label\" for=\"ds-topic\">Chủ đề video</label><div class=\"ds-prompt\"><textarea id=\"ds-topic\" placeholder=\"Ví dụ: Các quốc gia có dân số lớn nhất hiện nay\"></textarea><div class=\"ds-prompt-footer\"><span>0 / 300</span><button type=\"button\">Tạo góc nội dung</button></div></div>",
+      "css": ".ds-prompt-label{display:block;margin:0 0 10px;color:var(--ink,#f7f4ea);font-family:'Be Vietnam Pro',Arial,sans-serif;font-size:13px;font-weight:700}.ds-prompt{overflow:hidden;border:1px solid var(--line-strong,#3b4855);border-radius:15px;background:var(--panel,#121821);color:var(--ink,#f7f4ea);font-family:'Be Vietnam Pro',Arial,sans-serif;transition:border-color .18s ease}.ds-prompt:focus-within{border-color:var(--gold,#f2c94c)}.ds-prompt textarea{box-sizing:border-box;display:block;width:100%;min-height:132px;padding:22px 24px;border:0;outline:0;resize:vertical;background:transparent;color:inherit;font:400 17px/1.65 'Be Vietnam Pro',Arial,sans-serif}.ds-prompt textarea::placeholder{color:#6f7c89}.ds-prompt-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 13px 12px 20px;border-top:1px solid var(--line,#293440)}.ds-prompt-footer span{color:var(--muted,#9aa8b6);font-size:11px}.ds-prompt-footer button{min-height:43px;padding:0 17px;border:1px solid var(--gold,#f2c94c);border-radius:10px;background:var(--gold,#f2c94c);color:var(--gold-dark,#171407);font:700 13px/1.5 'Be Vietnam Pro',Arial,sans-serif;cursor:pointer}.ds-prompt-footer button:hover{background:#ffda61;border-color:#ffda61}.ds-prompt-footer button:focus-visible{outline:3px solid rgba(242,201,76,.9);outline-offset:3px}"
+    },
+    {
+      "name": "Active Workflow Step",
+      "kind": "nav",
+      "refersTo": "workflow-step-active",
+      "description": "Shows the current position in the four-stage production sequence.",
+      "html": "<button class=\"ds-workflow-step\" type=\"button\"><span class=\"ds-step-marker\">1</span><span><strong>Chủ đề</strong><small>Nhập ý tưởng ban đầu</small></span></button>",
+      "css": ".ds-workflow-step{box-sizing:border-box;width:100%;padding:13px 9px;border:0;border-radius:12px;background:#1b2430;color:var(--ink,#f7f4ea);display:flex;align-items:center;gap:12px;text-align:left;font-family:'Be Vietnam Pro',Arial,sans-serif;cursor:pointer;transition:background-color .18s ease,color .18s ease}.ds-workflow-step:hover{background:#222d39}.ds-workflow-step:focus-visible{outline:3px solid rgba(242,201,76,.9);outline-offset:3px}.ds-step-marker{display:grid;place-items:center;flex:0 0 29px;height:29px;border:1px solid var(--gold,#f2c94c);border-radius:50%;background:var(--gold,#f2c94c);color:var(--gold-dark,#171407);font-size:12px;font-weight:700}.ds-workflow-step strong,.ds-workflow-step small{display:block}.ds-workflow-step strong{font-size:13px}.ds-workflow-step small{margin-top:1px;font-size:11px;opacity:.7}"
+    },
+    {
+      "name": "Data Status Tag",
+      "kind": "chip",
+      "refersTo": "status-tag",
+      "description": "Compact semantic metadata for actual, estimated, and forecast figures.",
+      "html": "<span class=\"ds-tag ds-tag-actual\">Số công bố</span> <span class=\"ds-tag ds-tag-estimate\">Ước tính</span> <span class=\"ds-tag ds-tag-forecast\">Dự báo</span>",
+      "css": ".ds-tag{min-height:25px;padding:0 8px;border:1px solid var(--line,#293440);border-radius:7px;color:var(--soft,#c6d0d8);display:inline-flex;align-items:center;white-space:nowrap;font:400 11px/1.5 'Be Vietnam Pro',Arial,sans-serif}.ds-tag-actual{color:var(--green,#6bd39b);border-color:rgba(107,211,155,.35)}.ds-tag-estimate{color:var(--gold,#f2c94c);border-color:rgba(242,201,76,.35)}.ds-tag-forecast{color:var(--blue,#83b9ff);border-color:rgba(131,185,255,.35)}"
+    },
+    {
+      "name": "Rundown Row",
+      "kind": "custom",
+      "description": "Ruled, directional row used for quick starts and other concise choices.",
+      "html": "<button class=\"ds-rundown-row\" type=\"button\"><span>QUỐC GIA</span><strong>Dân số thế giới</strong><svg aria-hidden=\"true\" viewBox=\"0 0 24 24\"><path d=\"M5 12h14M14 7l5 5-5 5\"/></svg></button>",
+      "css": ".ds-rundown-row{box-sizing:border-box;width:100%;padding:16px 8px;border:0;border-top:1px solid var(--line,#293440);border-bottom:1px solid var(--line,#293440);background:transparent;color:var(--soft,#c6d0d8);display:grid;grid-template-columns:100px 1fr 24px;align-items:center;gap:16px;text-align:left;font-family:'Be Vietnam Pro',Arial,sans-serif;cursor:pointer;transition:background-color .16s ease,color .16s ease,transform .16s ease}.ds-rundown-row span{color:var(--muted,#9aa8b6);font-size:11px;letter-spacing:.08em}.ds-rundown-row strong{font-size:14px}.ds-rundown-row svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.ds-rundown-row:hover{background:#121a23;color:var(--ink,#f7f4ea);transform:translateX(3px)}.ds-rundown-row:focus-visible{outline:3px solid rgba(242,201,76,.9);outline-offset:3px}"
+    },
+    {
+      "name": "Vertical Preview",
+      "kind": "card",
+      "description": "9:16 output object with a skeletal ranking placeholder before rendering.",
+      "html": "<div class=\"ds-preview\"><div class=\"ds-preview-title\"></div><div class=\"ds-preview-subtitle\"></div><div class=\"ds-preview-list\"><i></i><i></i><i></i><i></i><i></i></div><p>Video sẽ xuất hiện ở đây sau khi render.</p></div>",
+      "css": ".ds-preview{box-sizing:border-box;position:relative;overflow:hidden;width:260px;aspect-ratio:9/16;padding:44px 22px 28px;border-radius:16px;background:#161c24;color:#818d99;display:flex;flex-direction:column;font:400 11px/1.55 'Be Vietnam Pro',Arial,sans-serif;box-shadow:0 24px 55px rgba(0,0,0,.34)}.ds-preview-title{width:78%;height:12px;margin:0 auto 9px;border-radius:3px;background:#e7e2d3}.ds-preview-subtitle{width:48%;height:6px;margin:0 auto 30px;border-radius:3px;background:#707b86}.ds-preview-list{border-top:1px solid #3a4652}.ds-preview-list i{display:block;height:32px;border-bottom:1px solid #33404c;position:relative}.ds-preview-list i:before,.ds-preview-list i:after{content:'';position:absolute;top:12px;height:7px;border-radius:2px;background:#697580}.ds-preview-list i:before{left:3px;width:48%}.ds-preview-list i:after{right:3px;width:25%}.ds-preview p{margin:auto 0 0;text-align:center}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Producer's Rundown",
+    "overview": "Ranking Studio behaves like a focused production desk: dark, quiet, and organized around one linear handoff from topic to finished video. Horizontal rules, compact metadata, and numbered checkpoints create the feel of a working rundown. Warm ivory carries the reading voice, cool blue grays carry supporting information, and the gold accent appears only where the operator should act or orient themselves.",
+    "keyCharacteristics": [
+      "Dark navy workspace with subtle tonal separation between structural regions.",
+      "Warm ivory typography rendered exclusively in Be Vietnam Pro for Vietnamese coverage.",
+      "Ruled lists and tables that read like production paperwork.",
+      "Gold reserved for the active step, the main action, and small progress cues.",
+      "Compact semantic colors for success, errors, forecasts, and source links."
+    ],
+    "rules": [
+      {"name": "The Single Signal Rule", "body": "Gold belongs to one dominant action or active state within a local region. Its scarcity is what makes the workflow easy to scan.", "section": "colors"},
+      {"name": "The Ruled Surface Rule", "body": "Prefer border lines and tonal changes to boxed cards when organizing related rows, metadata, or review content.", "section": "colors"},
+      {"name": "The One Family Rule", "body": "Use Be Vietnam Pro throughout the product, including numeric and compact metadata roles; use weight and spacing instead of adding another family.", "section": "typography"},
+      {"name": "The Flat Workflow Rule", "body": "Use tonal layering and borders for navigation, forms, tables, and lists. Reserve substantial shadow for previewed output.", "section": "elevation"}
+    ],
+    "dos": [
+      "Do keep gold concentrated on the current state and the action that advances the workflow.",
+      "Do organize repeated content with horizontal rules, compact rows, and shared alignment.",
+      "Do preserve the three-region desktop reading order and the sticky workflow strip on mobile.",
+      "Do use semantic mint, red, and blue only when the status or source meaning is real.",
+      "Do keep all Vietnamese interface text in Be Vietnam Pro with the bundled Vietnamese font files."
+    ],
+    "donts": [
+      "Don't turn workflow content into a grid of floating statistic cards.",
+      "Don't add gradients, decorative glass effects, or large shadows to ordinary working surfaces.",
+      "Don't use gold as a general decoration or on several competing actions in the same region.",
+      "Don't hide locked steps; reduced opacity communicates the complete process and current position.",
+      "Don't show the desktop preview rail below the established tablet breakpoint or compress it beside the mobile workspace."
+    ]
+  }
+}

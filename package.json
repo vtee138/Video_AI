@@ -1,0 +1,27 @@
+{
+  "name": "ai-ranking-video-local",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "web": "node src/server.mjs",
+    "flow:watch": "node src/flow-download-watch.mjs",
+    "db:seed": "node src/seed.mjs",
+    "db:migrate": "node src/migrate.mjs",
+    "test": "node --test src/*.test.mjs",
+    "post": "node src/tiktok.mjs",
+    "smoke": "node src/smoke.mjs"
+  },
+  "dependencies": {
+    "@fontsource/be-vietnam-pro": "^5.3.0",
+    "@remotion/bundler": "^4.0.336",
+    "@remotion/renderer": "^4.0.336",
+    "flag-icons": "^7.5.0",
+    "i18n-iso-countries": "^7.14.0",
+    "pg": "^8.23.1",
+    "playwright-core": "^1.64.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.336"
+  }
+}

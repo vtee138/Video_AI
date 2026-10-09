@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d1117">
+  <title>AI Video Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/flow.css">
+</head>
+<body>
+  <div class="app-shell" data-page="overview">
+    <header class="topbar">
+      <a class="brand" href="/" data-page="overview" aria-label="AI Video Studio — Tổng quan">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 28 28"><path d="M5 21V9h4v12M12 21V4h4v17M19 21v-8h4v8"/><path d="M3 24h22"/></svg>
+        </span>
+        <span>
+          <strong>AI Video Studio</strong>
+          <small>Local video workspace</small>
+        </span>
+      </a>
+      <div class="top-actions">
+        <a href="/" data-page="overview" class="activity-shortcut" id="activityShortcut">Đang kiểm tra phiên…</a>
+        <div class="system-state" id="systemState" aria-live="polite">
+          <span class="state-dot"></span>
+          <span>Đang kiểm tra cấu hình</span>
+        </div>
+        <button class="button ghost compact" id="newRunButton" type="button">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Phiên mới
+        </button>
+      </div>
+    </header>
+
+    <aside class="workflow" aria-label="Điều hướng chính">
+      <nav class="primary-nav" aria-label="Các trang">
+        <a href="/" data-page="overview" class="primary-link active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10 12 3l9 7v10H3V10Z"/><path d="M9 20v-6h6v6"/></svg></span><span>Tổng quan</span></a>
+        <a href="/create" data-page="create" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m10 9 5 3-5 3V9Z"/></svg></span><span>Tạo video</span></a>
+        <a href="/automation" data-page="automation" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M18.4 5.6l-2.1 2.1m-8.6 8.6-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg></span><span>Tự động hóa</span></a>
+        <a href="/flow" data-page="flow" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14v18H5zM8 16l3-3 2 2 3-4 2 2"/></svg></span><span>Thử đồ Flow</span></a>
+        <a href="/publishing" data-page="publishing" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M5 14v6h14v-6"/></svg></span><span>Xuất bản</span></a>
+        <a href="/library" data-page="library" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/></svg></span><span>Thư viện</span></a>
+        <a href="/music" data-page="music" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span>Kho nhạc</span></a>
+      </nav>
+      <div class="workflow-divider"></div>
+      <div class="workflow-heading">
+        <span>Quy trình</span>
+        <strong id="stepCounter">1 / 5</strong>
+      </div>
+      <button class="workflow-step active" data-stage="topic" type="button">
+        <span class="step-marker">1</span>
+        <span><strong>Thiết lập</strong><small>Chọn kiểu và chủ đề</small></span>
+      </button>
+      <button class="workflow-step" data-stage="ideas" type="button" disabled>
+        <span class="step-marker">2</span>
+        <span><strong>Chọn video</strong><small>Chọn một hoặc nhiều ý tưởng</small></span>
+      </button>
+      <button class="workflow-step" data-stage="queue" type="button" disabled>
+        <span class="step-marker">3</span>
+        <span><strong>Hàng chờ</strong><small>Nghiên cứu và render lần lượt</small></span>
+      </button>
+      <button class="workflow-step" data-stage="footage" type="button" disabled>
+        <span class="step-marker">4</span>
+        <span><strong>Footage</strong><small>Xem và chọn clip cho từng video</small></span>
+      </button>
+      <button class="workflow-step" data-stage="results" type="button" disabled>
+        <span class="step-marker">5</span>
+        <span><strong>Kết quả</strong><small>Xem và tải từng video</small></span>
+      </button>
+      <div class="workflow-note">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z"/><path d="m9 12 2 2 4-4"/></svg>
+        <p>API key chỉ được đọc bởi server local và không gửi xuống trình duyệt.</p>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div class="workspace-head">
+        <div>
+          <h1 id="pageTitle">Tổng quan</h1>
+          <p class="page-description" id="pageDescription">Bắt đầu một video mới hoặc tiếp tục công việc đang dở.</p>
+        </div>
+        <div class="run-id" id="runId">Chưa tạo phiên</div>
+      </div>
+
+      <div class="notice error" id="errorNotice" role="alert" hidden>
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg>
+        <div><strong>Chưa thể tiếp tục</strong><p id="errorText"></p></div>
+        <button type="button" id="dismissError" aria-label="Đóng thông báo">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="notice success" id="zernioNotice" role="status" hidden>
+        <div><strong>Đã kết nối Zernio</strong><p id="zernioNoticeText"></p></div>
+        <button type="button" id="dismissZernioNotice" aria-label="Đóng thông báo">×</button>
+      </div>
+
+      <section class="page" id="page-overview">
+        <div class="overview-intro">
+          <div><h2>Hôm nay bạn muốn làm gì?</h2><p>Từ một chủ đề, chọn ý tưởng, duyệt ảnh hoặc footage rồi xuất video. Các tác vụ tự động và video đã tạo có khu vực riêng.</p></div>
+          <button id="startNewButton" type="button" class="button primary">Tạo video mới <span aria-hidden="true">→</span></button>
+        </div>
+        <section class="session-monitor" aria-labelledby="sessionMonitorHeading">
+          <div class="session-monitor-head"><h2 id="sessionMonitorHeading">Phiên sản xuất</h2><p id="sessionMonitorSummary">Đang tải tiến độ…</p></div>
+          <div id="activeSessionList"></div>
+          <div id="attentionSessionList"></div>
+          <details class="session-history" id="sessionHistory" hidden>
+            <summary>Phiên gần đây</summary>
+            <div id="recentSessionList"></div>
+          </details>
+        </section>
+        <div class="overview-links">
+          <a href="/automation" data-page="automation"><strong>Tự động hóa</strong><span>Lên lịch và quản lý Super Auto</span><span aria-hidden="true">→</span></a>
+          <a href="/publishing" data-page="publishing"><strong>Xuất bản</strong><span>Kiểm tra từng video trên ba nền tảng</span><span aria-hidden="true">→</span></a>
+          <a href="/library" data-page="library"><strong>Thư viện video</strong><span>Xem, tải và đăng video đã render</span><span aria-hidden="true">→</span></a>
+        </div>
+        <div class="overview-activity"><h2>Tiếp tục công việc</h2><p>Phiên chưa hoàn tất và tác vụ đã lưu sẽ xuất hiện tại đây.</p>
+        <div class="recover-run" id="recoverRun" hidden>
+          <div><strong>Video chưa hoàn tất</strong><p id="recoverTitle"></p></div>
+          <button class="button ghost" id="recoverButton" type="button">Tìm lại footage</button>
+        </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-automation" hidden>
+        <div class="page-lead"><h2>Thiết lập tự động hóa</h2><p>Auto mode áp dụng cho các video bạn chọn trong bước Tạo video. Super Auto tự tìm chủ đề và chạy theo lịch bạn đặt.</p></div>
+        <section class="auto-mode" aria-labelledby="autoModeHeading">
+          <label class="auto-mode-toggle" for="autoModeToggle">
+            <span><strong id="autoModeHeading">Auto mode</strong><small>Sau khi bạn chọn video ở bước 2, tự lấy footage, render và đăng bài.</small></span>
+            <input id="autoModeToggle" type="checkbox" role="switch" aria-controls="autoModeSettings" aria-expanded="false">
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+          <div class="auto-settings" id="autoModeSettings" hidden>
+            <fieldset class="auto-platforms">
+              <legend>Đăng lên nền tảng</legend>
+              <label><input type="checkbox" name="autoPlatform" value="tiktok"> TikTok</label>
+              <label><input type="checkbox" name="autoPlatform" value="facebook"> Facebook Reels</label>
+              <label><input type="checkbox" name="autoPlatform" value="youtube"> YouTube Shorts</label>
+            </fieldset>
+            <p class="publish-hint" id="autoConfigHint" aria-live="polite">Bật Auto mode để kiểm tra tài khoản đã kết nối.</p>
+            <div class="zernio-connect-actions" id="autoConnectActions" hidden></div>
+            <div class="auto-account-fields" id="autoAccountFields" hidden>
+              <label class="publish-field" id="autoTiktokAccountField" hidden>Tài khoản TikTok
+                <select id="autoTiktokAccount"></select>
+              </label>
+              <label class="publish-field" id="autoFacebookAccountField" hidden>Facebook Page
+                <select id="autoFacebookAccount"></select>
+              </label>
+              <label class="publish-field" id="autoYoutubeAccountField" hidden>Kênh YouTube
+                <select id="autoYoutubeAccount"></select>
+              </label>
+            </div>
+            <div class="auto-platform-options" id="autoTiktokOptions" hidden>
+              <label class="publish-field">Quyền riêng tư TikTok<select id="autoTiktokPrivacy"></select></label>
+              <p class="publish-hint" id="autoTiktokHint" aria-live="polite"></p>
+              <label><input id="autoTiktokComment" type="checkbox" checked> Cho phép bình luận</label>
+              <label><input id="autoTiktokDuet" type="checkbox"> Cho phép Duet</label>
+              <label><input id="autoTiktokStitch" type="checkbox"> Cho phép Stitch</label>
+              <label><input id="autoTiktokAigc" type="checkbox"> Video/âm thanh được AI tạo hoặc chỉnh sửa đáng kể</label>
+            </div>
+            <div class="auto-platform-options" id="autoYoutubeOptions" hidden>
+              <label class="publish-field">Quyền riêng tư YouTube
+                <select id="autoYoutubePrivacy"><option value="public">Công khai</option><option value="unlisted">Không công khai</option><option value="private">Riêng tư</option></select>
+              </label>
+              <label><input id="autoYoutubeMadeForKids" type="checkbox"> Nội dung dành cho trẻ em</label>
+              <label><input id="autoYoutubeSynthetic" type="checkbox"> Có hình ảnh/âm thanh tổng hợp trông như thật</label>
+            </div>
+            <p class="auto-facebook-note" id="autoFacebookNote" hidden>Facebook Reels sẽ được đăng công khai ngay.</p>
+            <label class="auto-consent"><input id="autoConsent" type="checkbox"> Tôi đồng ý tự động đăng các video tôi chọn ở bước 2 lên nền tảng đã chọn mà không xem trước từng video và caption.</label>
+          </div>
+        </section>
+
+        <section class="super-auto" aria-labelledby="superAutoHeading">
+          <div class="super-auto-heading">
+            <h2 id="superAutoHeading">Super Auto</h2>
+            <p>Tự tìm chủ đề mới, sản xuất video và đăng liên tục theo khoảng cách bạn đặt. Bật Auto mode và chọn tài khoản ở phía trên trước khi chạy.</p>
+          </div>
+          <div class="super-auto-grid">
+            <label class="publish-field">Kiểu video
+              <select id="superTemplate"><option value="ranking">Ranking · có dữ liệu</option><option value="quote">Quote · thông điệp</option></select>
+            </label>
+            <label class="publish-field">Định hướng chủ đề (không bắt buộc)
+              <input id="superFocus" type="text" maxlength="300" placeholder="Ví dụ: kinh tế và đời sống tại Việt Nam">
+            </label>
+            <label class="publish-field">Giờ đăng bài đầu tiên
+              <input id="superStartAt" type="datetime-local" required>
+            </label>
+            <label class="publish-field">Khoảng cách tối thiểu giữa các bài
+              <select id="superInterval">
+                <option value="15">15 phút</option><option value="30">30 phút</option>
+                <option value="60">1 giờ</option><option value="120">2 giờ</option>
+                <option value="360" selected>6 giờ</option><option value="720">12 giờ</option>
+                <option value="1440">1 ngày</option><option value="2880">2 ngày</option>
+                <option value="4320">3 ngày</option><option value="10080">7 ngày</option>
+              </select>
+            </label>
+          </div>
+          <label class="auto-consent"><input id="superConsent" type="checkbox"> Tôi đồng ý để Super Auto tự chọn chủ đề, tạo và đăng các video tiếp theo lên nền tảng đã chọn cho đến khi tôi dừng chiến dịch.</label>
+          <div class="super-auto-actions"><button class="button primary" id="superStartButton" type="button">Bắt đầu Super Auto</button><span>Server cần tiếp tục chạy để đăng đúng lịch.</span></div>
+          <div class="super-auto-campaigns" id="superCampaigns"></div>
+        </section>
+
+        <div class="stage-actions"><p>Tài khoản chọn trong phiên trình duyệt; chiến dịch Super Auto được lưu trong PostgreSQL.</p><a href="/create" data-page="create" class="button ghost">Đi đến Tạo video</a></div>
+      </section>
+
+      <section class="page" id="page-flow" hidden>
+        <div class="page-lead flow-lead"><div><h2>Video thử đồ với Google Flow</h2><p>Thêm nhiều ảnh quần áo, chọn tài khoản đăng và chạy một đợt bằng credit Flow trong Edge đã đăng nhập.</p></div><a id="flowOpenBrowser" href="https://flow.google.com/" target="_blank" rel="noopener noreferrer" class="button ghost compact">Mở Flow</a></div>
+        <div class="flow-layout">
+          <form id="flowForm" class="flow-panel flow-form">
+            <div class="flow-panel-heading"><span class="flow-kicker">01 · Nguồn tạo</span><h3>Tạo đợt thử đồ</h3></div>
+            <label>Ảnh quần áo <span class="flow-required">Bắt buộc</span><input id="flowGarment" type="file" accept="image/png,image/jpeg,image/webp" multiple required></label>
+            <div class="flow-preview" id="flowGarmentPreview">Chọn nhiều ảnh sản phẩm, mỗi ảnh tạo một video</div>
+            <label>Danh mục trang phục<input id="flowCategory" type="text" value="váy" maxlength="60" placeholder="Ví dụ: váy, áo khoác"></label>
+            <div class="flow-grid-two"><label>Background từ kho<select id="flowBackground" required><option value="">Chọn background</option></select></label><label>Người mẫu tham chiếu <span class="flow-optional">Tùy chọn</span><select id="flowModel"><option value="">Tạo người mẫu nữ mới</option></select></label></div>
+            <div class="flow-upload-row"><label class="button ghost compact">Thêm background<input id="flowBackgroundUpload" type="file" accept="image/png,image/jpeg,image/webp" hidden></label><label class="button ghost compact">Thêm người mẫu<input id="flowModelUpload" type="file" accept="image/png,image/jpeg,image/webp" hidden></label></div>
+              <label>Thời lượng mong muốn<select id="flowDuration"><option value="8" selected>8 giây</option><option value="15">15 giây</option><option value="20">20 giây</option><option value="30">30 giây</option></select></label>
+              <p id="flowCreditEstimate" class="flow-credit-estimate"></p>
+                <label>Xác nhận dự toán credit video<input id="flowMaxCredits" type="number" min="10" step="10" required></label>
+              <label class="auto-consent"><input id="flowPreviewOnly" type="checkbox" checked> Chỉ tạo preview; chưa đăng video. Có thể đăng cả đợt sau khi xem.</label>
+              <fieldset class="auto-platforms"><legend>Tài khoản sẽ đăng khi bật đăng tự động</legend>
+                <label><input type="checkbox" name="flowPlatform" value="tiktok"> TikTok</label>
+                <label><input type="checkbox" name="flowPlatform" value="facebook"> Facebook Reels</label>
+                <label><input type="checkbox" name="flowPlatform" value="youtube"> YouTube Shorts</label>
+              </fieldset>
+              <p class="publish-hint" id="flowAccountHint">Đang kiểm tra tài khoản đã kết nối…</p>
+              <div class="auto-account-fields" id="flowAccountFields">
+                <label class="publish-field" id="flowTiktokAccountField" hidden>Tài khoản TikTok<select id="flowTiktokAccount"></select></label>
+                <label class="publish-field" id="flowFacebookAccountField" hidden>Facebook Page<select id="flowFacebookAccount"></select></label>
+                <label class="publish-field" id="flowYoutubeAccountField" hidden>Kênh YouTube<select id="flowYoutubeAccount"></select></label>
+              </div>
+              <div class="auto-platform-options" id="flowTiktokOptions" hidden>
+                <label class="publish-field">Quyền riêng tư TikTok<select id="flowTiktokPrivacy"></select></label>
+                <label><input id="flowTiktokComment" type="checkbox" checked> Cho phép bình luận</label>
+                <label><input id="flowTiktokDuet" type="checkbox"> Cho phép Duet</label>
+                <label><input id="flowTiktokStitch" type="checkbox"> Cho phép Stitch</label>
+                <label><input id="flowTiktokAigc" type="checkbox" checked> Đánh dấu nội dung AI</label>
+              </div>
+              <div class="auto-platform-options" id="flowYoutubeOptions" hidden>
+                <label class="publish-field">Quyền riêng tư YouTube<select id="flowYoutubePrivacy"><option value="public">Công khai</option><option value="unlisted">Không công khai</option><option value="private">Riêng tư</option></select></label>
+                <label><input id="flowYoutubeMadeForKids" type="checkbox"> Nội dung dành cho trẻ em</label>
+                <label><input id="flowYoutubeSynthetic" type="checkbox" checked> Có hình ảnh tổng hợp trông như thật</label>
+              </div>
+              <label class="auto-consent"><input id="flowConsent" type="checkbox"> Tôi đồng ý để app dùng credit Flow và, khi bật đăng, tự đăng toàn bộ video lên các tài khoản đã chọn.</label>
+              <p class="flow-note">Giữ Edge, tab Flow, tiện ích và server đang chạy trong suốt đợt. App không lưu mật khẩu Google.</p>
+              <p class="flow-status" id="flowExtensionStatus">Đang kiểm tra tiện ích Edge…</p>
+              <button id="flowSubmit" class="button primary" type="submit">Tạo preview bằng Flow</button>
+            <p id="flowFormStatus" class="flow-status" role="status"></p>
+          </form>
+          <div class="flow-panel flow-jobs-panel"><div class="flow-panel-heading"><span class="flow-kicker">02 · Tiến độ</span><h3>Hàng chờ Flow</h3><p>App tự tạo và tải từng video; chọn job để xem preview và trạng thái đăng.</p></div><div id="flowBatches"></div><div id="flowJobs" class="flow-jobs"></div></div>
+        </div>
+        <div id="flowDetail" class="flow-panel flow-detail" hidden></div>
+      </section>
+
+      <section class="page" id="page-library" hidden>
+        <div class="page-lead"><h2>Video đã tạo</h2><p>Quản lý các file MP4, caption và trạng thái đăng trong một nơi.</p></div>
+        <div class="library-toolbar">
+          <label>Tìm video<input id="librarySearch" type="search" placeholder="Tìm theo tiêu đề"></label>
+          <label>Trạng thái đăng<select id="libraryFilter"><option value="all">Tất cả</option><option value="not_posted">Chưa đăng</option><option value="posting">Đang đăng</option><option value="posted">Đã đăng</option><option value="failed">Đăng lỗi</option><option value="unknown">Chưa xác minh</option></select></label>
+        </div>
+        <p class="library-count" id="libraryCount" aria-live="polite"></p>
+        <div class="recent-outputs" id="recentOutputs" hidden>
+          <h2>Video đã render</h2>
+          <p>Trạng thái đăng được lưu trong PostgreSQL. Video cũ cần được xác minh lần đầu.</p>
+          <div id="recentOutputList"></div>
+        </div>
+        <p class="empty-message" id="libraryEmpty">Chưa có video nào. Tạo một video để bắt đầu thư viện.</p>
+      </section>
+
+      <section class="page" id="page-music" hidden>
+        <div class="page-lead"><h2>Kho nhạc nền</h2><p>Thêm nhạc một lần để các video mới tự chọn từ kho này.</p></div>
+        <div class="music-toolbar">
+          <div><strong id="musicSummary">Đang tải kho nhạc…</strong><p>Trọng số 1–10 quyết định tần suất tương đối. Chọn 0 để tạm ngừng dùng bài. Khi còn bài khác, video kế tiếp sẽ không lặp lại bài vừa dùng.</p></div>
+          <label class="button primary music-upload">Thêm nhạc<input id="musicFiles" type="file" accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4" multiple hidden></label>
+        </div>
+        <p class="music-status" id="musicStatus" role="status" aria-live="polite"></p>
+        <div id="musicList" class="music-list"></div>
+        <p id="musicEmpty" class="empty-message" hidden>Kho nhạc đang trống. Thêm MP3, WAV hoặc M4A để video mới có nhạc nền.</p>
+      </section>
+
+      <section class="page" id="page-publishing" hidden>
+        <div class="page-lead publishing-lead">
+          <div><h2>Theo dõi xuất bản</h2><p>Mỗi hàng là một video. Chọn Đăng ở nền tảng chưa đăng hoặc Thử lại khi lượt đăng gặp lỗi.</p></div>
+          <button class="button ghost compact" id="refreshPublishing" type="button">Cập nhật trạng thái</button>
+        </div>
+        <div class="publishing-summary" aria-label="Tổng quan xuất bản">
+          <p><strong id="publishingTotal">0</strong><span>video đã render</span></p>
+          <p><strong id="publishingComplete">0</strong><span>đủ 3 nền tảng</span></p>
+          <p><strong id="publishingPartial">0</strong><span>đăng một phần</span></p>
+          <p><strong id="publishingAttention">0</strong><span>cần xử lý</span></p>
+        </div>
+        <div class="publishing-toolbar">
+          <label>Tìm video<input id="publishingSearch" type="search" placeholder="Tìm theo tiêu đề"></label>
+          <label>Trạng thái<select id="publishingFilter"><option value="all">Tất cả</option><option value="complete">Đủ 3 nền tảng</option><option value="partial">Đăng một phần</option><option value="active">Đang xử lý</option><option value="failed">Có lỗi</option><option value="none">Chưa đăng</option></select></label>
+        </div>
+        <div class="publishing-table" role="table" aria-label="Trạng thái xuất bản theo nền tảng">
+          <div class="publishing-table-head" role="row">
+            <span role="columnheader">Video</span><span role="columnheader">TikTok</span>
+            <span role="columnheader">Facebook Reels</span><span role="columnheader">YouTube Shorts</span>
+          </div>
+          <div id="publishingRows" role="rowgroup" aria-live="polite"></div>
+        </div>
+        <p class="empty-message" id="publishingEmpty" hidden>Không có video phù hợp với bộ lọc.</p>
+      </section>
+
+      <section class="stage" id="stage-topic" hidden>
+        <div class="template-picker" aria-labelledby="templateHeading">
+          <div class="quick-heading"><div><h2 id="templateHeading">Chọn kiểu video</h2><p>Mỗi kiểu dùng chung hàng chờ và bước đăng.</p></div></div>
+          <div class="template-grid" role="radiogroup" aria-label="Kiểu video">
+            <button class="template-card selected" type="button" role="radio" aria-checked="true" data-template="ranking">
+              <span class="template-icon" aria-hidden="true">01</span>
+              <span><strong>Ranking</strong><small>Bảng xếp hạng có dữ liệu và nguồn</small></span>
+            </button>
+            <button class="template-card" type="button" role="radio" aria-checked="false" data-template="quote">
+              <span class="template-icon" aria-hidden="true">Aa</span>
+              <span><strong>Quote</strong><small>Hook trên ảnh, 5 ý chính ở caption</small></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="quote-mode" id="quoteMode" hidden>
+          <div class="quick-heading"><div><h2>Hook trên ảnh · 5 ý ở caption</h2><p>Ảnh giữ sự chú ý; caption triển khai đúng 5 ý sắc gọn, cụ thể.</p></div></div>
+          <div class="quote-library">
+            <div class="quote-library-head">
+              <div><h3>Kho ảnh Quote</h3><p>Mỗi video dùng ngẫu nhiên một ảnh trong kho. Ảnh được giữ lại cho các lần tạo sau.</p></div>
+              <label class="button ghost compact" for="quoteImageInput">Upload ảnh</label>
+              <input id="quoteImageInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+            </div>
+            <p id="quoteImageCount" class="quote-library-count" aria-live="polite">Đang tải kho ảnh…</p>
+            <div id="quoteImageList" class="quote-library-list"></div>
+          </div>
+        </div>
+
+        <div class="automation-shortcut">
+          <div><strong>Tự động hóa</strong><p id="autoStatus">Đang tạo thủ công. Bạn có thể bật tự lấy footage và đăng bài trong trang Tự động hóa.</p></div>
+          <a class="mini-button" href="/automation" data-page="automation">Thiết lập</a>
+        </div>
+
+        <form id="topicForm" class="topic-form">
+          <label for="topicInput" id="topicLabel">Chủ đề video</label>
+          <div class="prompt-box">
+            <textarea id="topicInput" name="prompt" rows="4" maxlength="300"
+              placeholder="Ví dụ: Các quốc gia có dân số lớn nhất hiện nay" required></textarea>
+            <div class="prompt-footer">
+              <span id="charCount">0 / 300</span>
+              <button class="button primary" id="ideaButton" type="submit">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 1.3 4.1L17 9l-3.7 1.9L12 15l-1.3-4.1L7 9l3.7-1.9L12 3Z"/><path d="m18.5 15 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7.7-2.3Z"/></svg>
+                <span id="ideaButtonText">Tạo góc nội dung</span>
+              </button>
+            </div>
+          </div>
+        </form>
+        <div class="quick-start">
+          <div class="quick-heading">
+            <h2 id="quickTitle">Bắt đầu nhanh</h2>
+            <p id="quickDescription">Chọn một chủ đề, sau đó sửa lại theo ý bạn.</p>
+          </div>
+          <div class="prompt-list">
+            <button type="button" data-prompt="Các quốc gia có dân số lớn nhất hiện nay">
+              <span>Quốc gia</span><strong>Dân số thế giới</strong>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+            </button>
+            <button type="button" data-prompt="Các thành phố đón nhiều khách quốc tế nhất">
+              <span>Du lịch</span><strong>Thành phố hút khách</strong>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+            </button>
+            <button type="button" data-prompt="Các công ty công nghệ giá trị nhất thế giới">
+              <span>Công nghệ</span><strong>Doanh nghiệp dẫn đầu</strong>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage" id="stage-ideas" hidden>
+        <div class="stage-intro">
+          <div>
+            <h2 id="ideasTitle">Chọn các video muốn tạo</h2>
+            <p id="ideasDescription">Chọn nhiều góc. Hệ thống sẽ đưa tất cả vào hàng chờ và xử lý tuần tự.</p>
+          </div>
+          <button class="button ghost" id="backToTopic" type="button">Sửa chủ đề</button>
+        </div>
+        <div class="idea-list" id="ideaList" role="group" aria-label="Danh sách ý tưởng"></div>
+        <div class="stage-actions">
+          <p id="ideaHint">Chưa chọn video nào.</p>
+          <button class="button primary" id="queueButton" type="button" disabled>
+            <span id="queueButtonText">Đưa vào hàng chờ</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="stage" id="stage-queue" hidden>
+        <div class="stage-intro">
+          <div>
+            <h2>Hàng chờ sản xuất</h2>
+            <p id="queueIntro">Mỗi video được chuẩn bị nội dung và tìm footage rồi chờ bạn duyệt clip trước khi render. Chỉ một tác vụ chạy tại một thời điểm.</p>
+          </div>
+          <div class="queue-heading-actions">
+            <button class="mini-button" id="queuePauseButton" type="button" hidden>Tạm dừng tiến trình</button>
+            <span class="queue-count" id="queueCount">0 video</span>
+          </div>
+        </div>
+        <div class="batch-progress">
+          <div class="progress-track" role="progressbar" aria-label="Tiến độ toàn bộ hàng chờ" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="batchProgressBar"></div>
+          </div>
+          <div class="progress-meta"><span id="batchProgressText">Đang khởi tạo hàng chờ</span><strong id="batchProgressValue">0%</strong></div>
+        </div>
+        <div class="queue-list" id="queueList"></div>
+        <div class="stage-actions">
+          <p id="queueFooter">Có thể giữ trang mở; các video sẽ tự chạy lần lượt.</p>
+          <button class="button primary" id="viewResultsButton" type="button" disabled>
+            Xem kết quả
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="stage" id="stage-footage" hidden>
+        <div class="stage-intro">
+          <div>
+            <h2 id="footageTitle">Chọn footage</h2>
+            <p id="footageIntro">Xem từng clip, chọn 8–20 clip khác nhau. Thứ tự chọn là thứ tự cắt cảnh trong video.</p>
+          </div>
+          <button class="button ghost" id="backToQueue" type="button">Về hàng chờ</button>
+        </div>
+        <div class="footage-toolbar">
+          <p id="footageSources"></p>
+          <label class="mini-button" id="localClipLabel" for="localClipInput">Thêm MP4 local</label>
+          <label class="mini-button" id="quoteImageLabel" for="quoteReviewImageInput" hidden>Upload vào kho ảnh</label>
+          <input id="quoteReviewImageInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+          <input id="localClipInput" type="file" accept="video/mp4,.mp4" multiple hidden>
+        </div>
+        <p class="footage-warning" id="footageWarning" hidden></p>
+        <div class="footage-grid" id="footageList"></div>
+        <div class="stage-actions footage-actions">
+          <p id="footageHint">Chưa chọn clip nào.</p>
+          <button class="button primary" id="confirmFootage" type="button" disabled>Tải clip đã chọn và render</button>
+        </div>
+      </section>
+
+      <section class="stage" id="stage-results" hidden>
+        <div class="stage-intro">
+          <div>
+            <h2>Kết quả trong phiên</h2>
+            <p>Xem trước, tải MP4 hoặc sao chép caption của từng video đã hoàn tất.</p>
+          </div>
+          <button class="button ghost" id="newBatchButton" type="button">Tạo phiên mới</button>
+        </div>
+        <div class="result-grid" id="resultList"></div>
+        <section class="publish-panel" id="publishPanel" hidden aria-labelledby="publishHeading">
+          <div class="stage-intro">
+            <div><h2 id="publishHeading">Đăng video</h2><p id="publishFile"></p></div>
+            <button class="button ghost compact" id="closePublish" type="button">Đóng</button>
+          </div>
+          <form id="publishForm">
+            <fieldset class="publish-platforms">
+              <legend>Nền tảng</legend>
+              <label><input type="checkbox" name="platform" value="tiktok"> TikTok</label>
+              <label><input type="checkbox" name="platform" value="facebook"> Facebook Reels</label>
+              <label><input type="checkbox" name="platform" value="youtube"> YouTube Shorts</label>
+            </fieldset>
+            <p class="publish-hint" id="publishConfigHint"></p>
+            <div class="zernio-connect-actions" id="publishConnectActions" hidden></div>
+            <div id="publishAccountFields" hidden>
+              <label class="publish-field" id="tiktokAccountField" hidden>Tài khoản TikTok trên Zernio
+                <select id="tiktokAccount"></select>
+              </label>
+              <label class="publish-field" id="facebookAccountField" hidden>Facebook Page trên Zernio
+                <select id="facebookAccount"></select>
+              </label>
+              <label class="publish-field" id="youtubeAccountField" hidden>Kênh YouTube trên Zernio
+                <select id="youtubeAccount"></select>
+              </label>
+            </div>
+              <p class="publish-hint">Mỗi nền tảng có bản nháp riêng. Hãy sửa câu mở đầu để khớp chính xác với video.</p>
+              <div class="publish-copy-group" id="tiktokCopy" hidden>
+                <h3>TikTok</h3>
+                <label class="publish-field">Caption TikTok
+                  <textarea id="publishTikTokCaption" rows="5" maxlength="2200" required></textarea>
+                </label>
+              </div>
+              <div class="publish-copy-group" id="facebookCopy" hidden>
+                <h3>Facebook Reels</h3>
+                <label class="publish-field">Tiêu đề Facebook
+                  <input id="publishFacebookTitle" maxlength="100" required>
+                </label>
+                <label class="publish-field">Caption Facebook
+                  <textarea id="publishFacebookCaption" rows="5" required></textarea>
+                </label>
+              </div>
+              <div class="publish-copy-group" id="youtubeCopy" hidden>
+                <h3>YouTube Shorts</h3>
+                <label class="publish-field">Tiêu đề YouTube
+                  <input id="publishYouTubeTitle" maxlength="100" required>
+                </label>
+                <label class="publish-field">Mô tả YouTube
+                  <textarea id="publishYouTubeDescription" rows="5" required></textarea>
+                </label>
+              </div>
+            <div class="publish-options" id="tiktokOptions" hidden>
+              <label class="publish-field">Quyền riêng tư TikTok
+                <select id="tiktokPrivacy" aria-label="Quyền riêng tư TikTok"></select>
+              </label>
+              <div class="publish-connection" aria-live="polite">
+                <p id="tiktokConnection">Chọn TikTok để kiểm tra tài khoản và quyền đăng.</p>
+                <button class="mini-button" id="retryTikTok" type="button" hidden>Thử lại kết nối</button>
+              </div>
+              <label><input type="checkbox" id="tiktokComment" checked> Cho phép bình luận</label>
+              <label><input type="checkbox" id="tiktokDuet"> Cho phép Duet</label>
+              <label><input type="checkbox" id="tiktokStitch"> Cho phép Stitch</label>
+                <label><input type="checkbox" id="tiktokAigc"> Video/âm thanh được AI tạo hoặc chỉnh sửa đáng kể</label>
+            </div>
+            <div class="publish-options" id="youtubeOptions" hidden>
+              <label class="publish-field">Quyền riêng tư YouTube
+                  <select id="youtubePrivacy"><option value="public">Công khai</option><option value="unlisted">Không công khai</option><option value="private">Riêng tư</option></select>
+              </label>
+              <label><input type="checkbox" id="youtubeMadeForKids"> Nội dung dành cho trẻ em</label>
+              <label><input type="checkbox" id="youtubeSynthetic"> Có hình ảnh/âm thanh tổng hợp trông như thật</label>
+            </div>
+            <label class="publish-consent"><input type="checkbox" id="publishConsent" required> Tôi đã xem video, kiểm tra caption và đồng ý đăng lên các nền tảng đã chọn.</label>
+            <p class="publish-error" id="publishError" role="alert" hidden></p>
+            <div class="stage-actions"><p>Việc xử lý sau khi tải lên có thể mất thêm thời gian.</p><button class="button primary" id="publishSubmit" type="submit">Đăng video</button></div>
+          </form>
+          <div id="publishStatus" class="publish-status" aria-live="polite" hidden></div>
+        </section>
+      </section>
+
+      <div class="loading-sheet" id="loadingSheet" hidden aria-live="polite">
+        <div class="skeleton-line wide"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+        <p id="loadingText">Đang xử lý…</p>
+      </div>
+    </main>
+
+    <aside class="preview-panel">
+      <div class="preview-head">
+        <div><span>Xem trước</span><strong>9:16</strong></div>
+        <span class="preview-status" id="previewStatus">Chờ nội dung</span>
+      </div>
+      <div class="phone-frame">
+        <div class="preview-empty" id="previewEmpty">
+          <div class="mock-title"></div>
+          <div class="mock-subtitle"></div>
+          <div class="mock-list">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="mock-quote" id="mockQuote" hidden aria-hidden="true">
+            <i></i><i></i><i></i>
+          </div>
+          <p>Video sẽ xuất hiện ở đây sau khi render.</p>
+        </div>
+        <video id="videoPreview" controls playsinline hidden></video>
+      </div>
+      <dl class="video-specs">
+        <div><dt>Thời lượng</dt><dd id="specDuration">30 giây</dd></div>
+        <div><dt>Kích thước</dt><dd>1080 × 1920</dd></div>
+        <div><dt>Bố cục</dt><dd id="specLayout">Top 10 xuyên suốt</dd></div>
+      </dl>
+      <div class="run-summary" id="runSummary">
+        <span class="summary-line"></span>
+        <p>Nhập chủ đề để bắt đầu một phiên sản xuất mới.</p>
+      </div>
+    </aside>
+  </div>
+  <dialog class="preview-dialog" id="previewDialog" aria-labelledby="previewDialogTitle">
+    <div class="preview-dialog-head"><strong id="previewDialogTitle">Xem video</strong><button class="mini-button" id="closePreviewDialog" type="button">Đóng</button></div>
+    <video id="dialogVideo" controls playsinline></video>
+  </dialog>
+  <dialog class="delete-dialog" id="deleteDialog" aria-labelledby="deleteDialogTitle" aria-describedby="deleteDialogDescription">
+    <h2 id="deleteDialogTitle">Xác nhận xóa</h2>
+    <p id="deleteDialogName" class="delete-dialog-name"></p>
+    <p id="deleteDialogDescription"></p>
+    <p class="delete-dialog-error" id="deleteDialogError" role="alert" hidden></p>
+    <div class="delete-dialog-actions">
+      <button class="button ghost" id="cancelDelete" type="button">Giữ lại</button>
+      <button class="button danger" id="confirmDelete" type="button">Xóa</button>
+    </div>
+  </dialog>
+  <script src="/app.js" defer></script>
+  <script src="/flow.js" defer></script>
+</body>
+</html>
