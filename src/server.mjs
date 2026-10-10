@@ -31,6 +31,7 @@ import {activePostForOutput, activeSuperCampaigns, claimDueSuperItem, claimNextS
 import {nextPostAt, validateSuperPlan} from './super-auto.mjs';
 import {concurrencyConfig, Semaphore} from './concurrency.mjs';
 import {nextRunnableJobIndex, queueStatus} from './queue-control.mjs';
+import {sameUiOrigin} from './request-origin.mjs';
 import {handleFlowRequest} from './flow-tryon.mjs';
 import {watchFlowDownloads} from './flow-download-watch.mjs';
 import {deleteRemoteMedia, ensureLocalMedia, remoteMedia} from './storage.mjs';
@@ -1044,9 +1045,7 @@ async function thumbnailFor(outputName) {
 }
 
 function localDeletionRequest(req) {
-  if (!req.headers.origin) return true;
-  try { return new URL(req.headers.origin).origin === `http://${req.headers.host}`; }
-  catch { return false; }
+  return sameUiOrigin(req);
 }
 
 async function removeRunArtifacts(ids) {
@@ -1154,7 +1153,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/music') {
-      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ thêm nhạc từ giao diện local.'}); return; }
+      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ thêm nhạc từ giao diện ứng dụng.'}); return; }
       const name = req.headers['x-file-name'];
       if (typeof name !== 'string' || name.length > 300) throw new Error('Tên file nhạc không hợp lệ.');
       json(res, 201, {track: await uploadMusic(req, decodeURIComponent(name))});
@@ -1162,7 +1161,7 @@ const server = createServer(async (req, res) => {
     }
     const musicMatch = /^\/api\/music\/(.+)$/.exec(url.pathname);
     if (musicMatch && (req.method === 'PATCH' || req.method === 'DELETE')) {
-      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ sửa kho nhạc từ giao diện local.'}); return; }
+      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ sửa kho nhạc từ giao diện ứng dụng.'}); return; }
       const name = decodeURIComponent(musicMatch[1]);
       if (req.method === 'DELETE') {
         await deleteMusic(name);
@@ -1178,7 +1177,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/quote-images') {
-      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ upload ảnh từ giao diện local.'}); return; }
+      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ upload ảnh từ giao diện ứng dụng.'}); return; }
       const image = await uploadQuoteImage(req);
       for (const run of runs.values()) if (run.template === 'quote' && run.status === 'footage_review') {
         run.candidates ||= [];
@@ -1190,7 +1189,7 @@ const server = createServer(async (req, res) => {
     }
     const quoteImageDelete = /^\/api\/quote-images\/([a-f0-9-]+\.(?:jpg|png|webp))$/.exec(url.pathname);
     if (req.method === 'DELETE' && quoteImageDelete) {
-      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ xóa ảnh từ giao diện local.'}); return; }
+      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ xóa ảnh từ giao diện ứng dụng.'}); return; }
       await deleteQuoteImage(quoteImageDelete[1]);
       for (const run of runs.values()) if (run.template === 'quote' && run.status === 'footage_review') {
         run.candidates = (run.candidates || []).filter(image => image.id !== quoteImageDelete[1]);
@@ -1227,8 +1226,8 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/posts/connect') {
       const origin = req.headers.origin;
-      if (![`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(origin)) {
-        json(res, 403, {error: 'Yêu cầu kết nối phải đến từ giao diện local.'}); return;
+      if (!sameUiOrigin(req, {requireOrigin: true})) {
+        json(res, 403, {error: 'Yêu cầu kết nối phải đến từ giao diện ứng dụng.'}); return;
       }
       const input = await body(req);
       const platform = String(input.platform || '');
@@ -1239,7 +1238,7 @@ const server = createServer(async (req, res) => {
         json(res, 200, {alreadyConnected: true, account: connected}); return;
       }
       const nonce = randomUUID();
-      const redirectUrl = new URL(`http://${host}:${port}/`);
+      const redirectUrl = new URL('/', origin);
       redirectUrl.searchParams.set('zernio_platform', platform);
       redirectUrl.searchParams.set('zernio_state', nonce);
       const connection = await zernioConnectUrl(platform, redirectUrl.toString());
@@ -1251,9 +1250,8 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/posts') {
-      const origin = req.headers.origin;
-      if (origin && !['127.0.0.1', 'localhost'].includes(new URL(origin).hostname)) {
-        json(res, 403, {error: 'Yêu cầu đăng bài phải đến từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Yêu cầu đăng bài phải đến từ giao diện ứng dụng.'}); return;
       }
       const input = await body(req);
       const outputName = String(input.outputName || '');
@@ -1316,7 +1314,7 @@ const server = createServer(async (req, res) => {
     }
     const deleteSessionMatch = /^\/api\/sessions\/(\d{4}-\d{2}-\d{2}T[\d-]+Z)$/.exec(url.pathname);
     if (req.method === 'DELETE' && deleteSessionMatch) {
-      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ có thể xóa từ giao diện local.'}); return; }
+      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ có thể xóa từ giao diện ứng dụng.'}); return; }
       const id = deleteSessionMatch[1];
       if (retryingSessions.has(id) || [...runs.values()].some(run =>
         (run.id === id || run.parentId === id) &&
@@ -1332,7 +1330,7 @@ const server = createServer(async (req, res) => {
     }
     const deleteOutputMatch = /^\/api\/outputs\/([a-zA-Z0-9._-]+\.mp4)$/.exec(url.pathname);
     if (req.method === 'DELETE' && deleteOutputMatch) {
-      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ có thể xóa từ giao diện local.'}); return; }
+      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ có thể xóa từ giao diện ứng dụng.'}); return; }
       const name = deleteOutputMatch[1];
       if ([...runs.values()].some(run => run.outputName === name &&
         ['publishing', 'rendering'].includes(run.status))) {
@@ -1344,8 +1342,8 @@ const server = createServer(async (req, res) => {
     }
     const retryMatch = /^\/api\/sessions\/([^/]+)\/retry$/.exec(url.pathname);
     if (req.method === 'POST' && retryMatch) {
-      if (req.headers.origin && !['127.0.0.1', 'localhost'].includes(new URL(req.headers.origin).hostname)) {
-        json(res, 403, {error: 'Retry chỉ nhận yêu cầu từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Retry chỉ nhận yêu cầu từ giao diện ứng dụng.'}); return;
       }
       json(res, 202, await retrySession(retryMatch[1]));
       return;
@@ -1356,8 +1354,8 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/super-auto') {
-      if (req.headers.origin && !['127.0.0.1', 'localhost'].includes(new URL(req.headers.origin).hostname)) {
-        json(res, 403, {error: 'Super Auto chỉ nhận yêu cầu từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Super Auto chỉ nhận yêu cầu từ giao diện ứng dụng.'}); return;
       }
       if ((await activeSuperCampaigns()).length) throw new Error('Hãy dừng chiến dịch Super Auto đang chạy trước.');
       const input = await body(req);
@@ -1370,8 +1368,8 @@ const server = createServer(async (req, res) => {
     }
     const superAction = /^\/api\/super-auto\/([\w-]+)\/(stop|resume)$/.exec(url.pathname);
     if (req.method === 'POST' && superAction) {
-      if (req.headers.origin && !['127.0.0.1', 'localhost'].includes(new URL(req.headers.origin).hostname)) {
-        json(res, 403, {error: 'Super Auto chỉ nhận yêu cầu từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Super Auto chỉ nhận yêu cầu từ giao diện ứng dụng.'}); return;
       }
       if (superAction[2] === 'stop') await stopSuperCampaign(superAction[1]);
       else { await resumeSuperCampaign(superAction[1]); void tickSuperAuto(); }
@@ -1380,8 +1378,8 @@ const server = createServer(async (req, res) => {
     }
     const superRetry = /^\/api\/super-auto\/([\w-]+)\/items\/([\w-]+)\/retry$/.exec(url.pathname);
     if (req.method === 'POST' && superRetry) {
-      if (req.headers.origin && !['127.0.0.1', 'localhost'].includes(new URL(req.headers.origin).hostname)) {
-        json(res, 403, {error: 'Retry Super Auto chỉ nhận yêu cầu từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Retry Super Auto chỉ nhận yêu cầu từ giao diện ứng dụng.'}); return;
       }
       const retry = await claimSuperItemRetry(superRetry[1], superRetry[2]);
       void retrySuperItem(retry.campaign, retry.item);
@@ -1390,8 +1388,8 @@ const server = createServer(async (req, res) => {
     }
     const superFootageRepair = /^\/api\/super-auto\/([\w-]+)\/items\/([\w-]+)\/footage$/.exec(url.pathname);
     if (req.method === 'POST' && superFootageRepair) {
-      if (req.headers.origin && !['127.0.0.1', 'localhost'].includes(new URL(req.headers.origin).hostname)) {
-        json(res, 403, {error: 'Chỉ có thể bổ sung footage từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Chỉ có thể bổ sung footage từ giao diện ứng dụng.'}); return;
       }
       const recovery = await claimSuperItemFootageRepair(superFootageRepair[1], superFootageRepair[2]);
       try {
@@ -1408,9 +1406,8 @@ const server = createServer(async (req, res) => {
     }
     const superRetryFailed = /^\/api\/super-auto\/([\w-]+)\/retry-failed$/.exec(url.pathname);
     if (req.method === 'POST' && superRetryFailed) {
-      const origin = req.headers.origin;
-      if (origin && !['127.0.0.1', 'localhost'].includes(new URL(origin).hostname)) {
-        json(res, 403, {error: 'Retry Super Auto chỉ nhận yêu cầu từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Retry Super Auto chỉ nhận yêu cầu từ giao diện ứng dụng.'}); return;
       }
       const input = await body(req);
       const settings = input.auto ? await validateAutoSettings(input.auto, await postConfig(), tiktokCreator) : null;
@@ -1421,9 +1418,8 @@ const server = createServer(async (req, res) => {
     }
     const publicationMatch = /^\/api\/outputs\/([a-zA-Z0-9._-]+\.mp4)\/publication$/.exec(url.pathname);
     if (req.method === 'POST' && publicationMatch) {
-      const origin = req.headers.origin;
-      if (origin && !['127.0.0.1', 'localhost'].includes(new URL(origin).hostname)) {
-        json(res, 403, {error: 'Chỉ có thể cập nhật trạng thái từ giao diện local.'}); return;
+      if (!sameUiOrigin(req)) {
+        json(res, 403, {error: 'Chỉ có thể cập nhật trạng thái từ giao diện ứng dụng.'}); return;
       }
       const input = await body(req);
       await markPublication(publicationMatch[1], input.status);
@@ -1450,8 +1446,8 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && queueMatch) {
       const parent = getRun(queueMatch[1]);
       const input = await body(req);
-      if (input.auto && req.headers.origin && !['127.0.0.1', 'localhost'].includes(new URL(req.headers.origin).hostname)) {
-        json(res, 403, {error: 'Auto mode chỉ nhận yêu cầu từ giao diện local.'}); return;
+      if (input.auto && !sameUiOrigin(req)) {
+        json(res, 403, {error: 'Auto mode chỉ nhận yêu cầu từ giao diện ứng dụng.'}); return;
       }
       const queue = await createQueue(parent, input.selections, input.auto);
       json(res, 202, {queue});
@@ -1466,7 +1462,7 @@ const server = createServer(async (req, res) => {
     }
     const queueAction = /^\/api\/runs\/([^/]+)\/queue\/(pause|resume)$/.exec(url.pathname);
     if (req.method === 'POST' && queueAction) {
-      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ có thể điều khiển hàng chờ từ giao diện local.'}); return; }
+      if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ có thể điều khiển hàng chờ từ giao diện ứng dụng.'}); return; }
       const parent = getRun(queueAction[1]);
       json(res, 200, {queue: await setQueuePaused(parent, queueAction[2] === 'pause')});
       return;
