@@ -21,7 +21,9 @@ function composePostCopy(title, caption) {
 }
 
 const state = {
-  template: 'ranking',
+  workspace: window.location.pathname.split('/')[1] === 'quote' ? 'quote'
+    : window.location.pathname.split('/')[1] === 'flow' ? 'flow' : 'ranking',
+  template: window.location.pathname.split('/')[1] === 'quote' ? 'quote' : 'ranking',
   quoteMode: 'caption',
   runId: null,
   ideas: [],
@@ -38,6 +40,11 @@ const state = {
   reviewJobId: null,
   reviewSelections: new Set(),
   quoteImages: [],
+  quoteKnowledge: [],
+  quoteCategories: [],
+  selectedQuoteCategories: new Set(),
+  newQuoteCategories: new Set(),
+  quoteKnowledgeLoaded: false,
   recoverId: null,
   publishItem: null,
   publishSelectedPlatform: null,
@@ -55,11 +62,15 @@ const state = {
 };
 
 const stageOrder = ['topic', 'ideas', 'queue', 'footage', 'results'];
-const stagePaths = {topic: '/create', ideas: '/create/ideas', queue: '/create/queue',
-  footage: '/create/footage', results: '/create/results'};
-const pagePaths = {overview: '/', automation: '/automation', flow: '/flow', publishing: '/publishing',
-  library: '/library', music: '/music'};
+const workspacePath = (section = '') => `/${state.workspace}${section ? `/${section}` : ''}`;
+const stagePaths = () => ({topic: workspacePath('create'), ideas: workspacePath('create/ideas'),
+  queue: workspacePath('create/queue'), footage: workspacePath('create/footage'),
+  results: workspacePath('create/results')});
+const pagePaths = () => ({home: '/', overview: workspacePath(), automation: workspacePath('automation'),
+  flow: '/flow', publishing: workspacePath('publishing'), library: workspacePath('library'),
+  music: workspacePath('music')});
 const pageCopy = {
+  home: ['Menu tổng', 'Chọn dạng video để mở khu làm việc riêng.'],
   overview: ['Tổng quan', 'Bắt đầu một video mới hoặc tiếp tục công việc đang dở.'],
   automation: ['Tự động hóa', 'Thiết lập Auto mode và quản lý chiến dịch Super Auto.'],
   flow: ['Thử đồ Flow', 'Tạo ảnh thử đồ, duyệt ảnh và theo dõi video từ Google Flow.'],
@@ -118,14 +129,26 @@ function setLoading(active, message = 'Đang xử lý…') {
 function updatePageChrome(page) {
   state.currentPage = page;
   $('.app-shell').dataset.page = page;
+  $$('a[data-page]').forEach(link => {
+    link.href = link.dataset.page === 'create' ? stagePaths().topic : pagePaths()[link.dataset.page] || '/';
+  });
   $$('.primary-link').forEach(link => {
-    const active = link.dataset.page === page;
+    const active = link.dataset.page === page || (page === 'overview' && link.dataset.workspace === state.workspace)
+      || (page === 'create' && link.dataset.page === 'create');
     link.classList.toggle('active', active);
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
   $('#runId').hidden = page !== 'create';
   $('#stepCounter').hidden = page !== 'create';
+  const inWorkspace = page !== 'home' && page !== 'flow';
+  $$('.primary-link[data-page]').forEach(link => {
+    link.hidden = inWorkspace ? link.dataset.page === 'flow'
+      : !['home', 'flow'].includes(link.dataset.page);
+  });
+  $$('.workspace-link').forEach(link => { link.hidden = page !== 'home' && link.dataset.workspace !== state.workspace; });
+  $('#newRunButton').hidden = !inWorkspace;
+  $('#activityShortcut').hidden = !inWorkspace;
 }
 
 function updatePath(path, replace = false) {
@@ -143,10 +166,13 @@ function setPage(page, {history = true, replace = false} = {}) {
   $$('.page').forEach(section => { section.hidden = section.id !== `page-${page}`; });
   $$('.stage').forEach(section => { section.hidden = true; section.classList.remove('active'); });
   $('#loadingSheet').hidden = true;
-  $('#pageTitle').textContent = pageCopy[page][0];
-  $('#pageDescription').textContent = pageCopy[page][1];
+  $('#pageTitle').textContent = page === 'overview' ? state.workspace === 'quote' ? 'Quote' : 'Ranking'
+    : page === 'music' ? `Kho nhạc ${state.workspace === 'quote' ? 'Quote' : 'Ranking'}` : pageCopy[page][0];
+  $('#pageDescription').textContent = page === 'overview'
+    ? `Phiên sản xuất ${state.workspace === 'quote' ? 'Quote' : 'Ranking'} và các công cụ của dạng video này.`
+    : pageCopy[page][1];
   document.title = `${pageCopy[page][0]} · AI Video Studio`;
-  if (history) updatePath(pagePaths[page], replace);
+  if (history) updatePath(pagePaths()[page], replace);
   if (page === 'publishing') void refreshOutputs();
   if (page === 'flow') void window.refreshFlow?.();
   if (page === 'music') void refreshMusic().catch(showError);
@@ -173,13 +199,16 @@ function setStage(name, {history = true, replace = false} = {}) {
   });
   $('#stepCounter').textContent = `${index + 1} / 5`;
   $('#pageTitle').textContent = name === 'topic' && state.template === 'quote'
-    ? 'Hôm nay bạn muốn nói thẳng điều gì?'
+    ? 'Chọn mảng để tạo Quote'
     : name === 'footage' && state.template === 'quote' ? 'Chọn ảnh cho video'
     : stageCopy[name];
-  $('#pageDescription').textContent = ['Chọn kiểu video và nhập chủ đề.', 'Chọn những ý tưởng muốn sản xuất.',
-    'Theo dõi tiến độ từng video.', 'Duyệt clip trước khi render.', 'Xem, tải và đăng video hoàn tất.'][index];
+  $('#pageDescription').textContent = [state.template === 'quote'
+    ? 'Hệ thống tự rút nhiều ý từ kho triết lý và viết 8 Quote theo các mảng đã chọn.'
+    : 'Nhập chủ đề cho dạng video hiện tại.', 'Chọn những ý tưởng muốn sản xuất.',
+    'Theo dõi tiến độ từng video.', state.template === 'quote' ? 'Chọn ảnh từ kho Quote trước khi render.'
+      : 'Duyệt clip trước khi render.', 'Xem, tải và đăng video hoàn tất.'][index];
   document.title = `${['Tạo video', 'Chọn video', 'Hàng chờ', 'Footage', 'Kết quả'][index]} · AI Video Studio`;
-  if (history) updatePath(stagePaths[name], replace);
+  if (history) updatePath(stagePaths()[name], replace);
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
@@ -192,19 +221,40 @@ function statusLabel(status) {
 }
 
 function selectTemplate(template) {
+  if (template !== state.workspace) return;
   state.template = template;
+  $('#superTemplate').value = template;
+  $('#superTemplate').disabled = true;
   if (template === 'quote') state.quoteMode = 'caption';
   if (template === 'quote') void loadQuoteImages().catch(showError);
+  if (template === 'quote') void loadQuoteKnowledge().catch(showError);
   $$('[data-template]').forEach(button => {
     const selected = button.dataset.template === template;
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-checked', String(selected));
   });
   $('#quoteMode').hidden = template !== 'quote';
-  $('#topicLabel').textContent = template === 'quote' ? 'Chủ đề hoặc quy tắc sống' : 'Chủ đề video';
-  $('#topicInput').placeholder = template === 'quote'
-    ? 'Ví dụ: Kỷ luật khi không ai nhìn thấy'
-    : 'Ví dụ: Các quốc gia có dân số lớn nhất hiện nay';
+  const topicStage = $('#stage-topic');
+  topicStage.classList.toggle('quote-workspace', template === 'quote');
+  topicStage.insertBefore($('#topicForm'), template === 'quote' ? $('#quoteMode') : $('#quickStart'));
+  $('.workflow-step[data-stage="topic"] small').textContent = template === 'quote'
+    ? 'Chọn mảng nội dung' : 'Nhập chủ đề video';
+  const footageStep = $('.workflow-step[data-stage="footage"]');
+  footageStep.querySelector('strong').textContent = template === 'quote' ? 'Ảnh Quote' : 'Footage';
+  footageStep.querySelector('small').textContent = template === 'quote'
+    ? 'Chọn nhiều ảnh từ kho Quote' : 'Xem và chọn clip cho từng video';
+  $('.workflow-step[data-stage="queue"] small').textContent = template === 'quote'
+    ? 'Viết nội dung và render lần lượt' : 'Nghiên cứu và render lần lượt';
+  $('.overview-intro p').textContent = template === 'quote'
+    ? 'Tạo Quote nguyên bản, chọn ảnh từ kho Quote và theo dõi từng video trong phiên này.'
+    : 'Tạo bảng xếp hạng có nguồn dữ liệu, duyệt footage và theo dõi từng video trong phiên này.';
+  $('#topicLabel').hidden = template === 'quote';
+  $('#topicInput').placeholder = 'Ví dụ: Các quốc gia có dân số lớn nhất hiện nay';
+  $('#topicInput').required = template !== 'quote';
+  $('#rankingPromptBox').hidden = template === 'quote';
+  $('#quoteCategoryPicker').hidden = template !== 'quote';
+  $('#quoteCreateAction').hidden = template !== 'quote';
+  $('#quickStart').hidden = template === 'quote';
   $('#ideaButtonText').textContent = template === 'quote' ? 'Tạo 8 Quote' : 'Tạo góc nội dung';
   $('#quickDescription').textContent = template === 'quote'
     ? 'Chọn một góc nhìn về kỷ luật, kinh doanh hoặc bản lĩnh rồi chỉnh theo ý bạn.'
@@ -222,13 +272,14 @@ function selectTemplate(template) {
   $('#previewEmpty').classList.toggle('quote', template === 'quote');
   $('#mockQuote').hidden = template !== 'quote';
   if (state.currentStage === 'topic') $('#pageTitle').textContent = template === 'quote'
-    ? 'Hôm nay bạn muốn nói thẳng điều gì?' : stageCopy.topic;
+    ? 'Chọn mảng, để hệ thống tìm góc Quote' : stageCopy.topic;
+  if (template === 'quote' && !state.runId) setRunSummary('Chọn mảng nội dung để hệ thống rút ý ngẫu nhiên từ kho và tạo 8 Quote.');
 }
 
 function renderQuoteImages() {
   $('#quoteImageCount').textContent = state.quoteImages.length
-    ? `${state.quoteImages.length} ảnh trong kho · JPG, PNG hoặc WebP · tối đa 20 MB mỗi ảnh`
-    : 'Kho ảnh đang trống. Upload ít nhất một ảnh trước khi tạo video Quote.';
+    ? `${state.quoteImages.length} ảnh trong kho${state.quoteImages.length < 2 ? ' · cần thêm một ảnh cho Auto mode' : ''} · JPG, PNG hoặc WebP · tối đa 20 MB mỗi ảnh`
+    : 'Kho ảnh đang trống. Upload ít nhất một ảnh để tạo video Quote thủ công.';
   $('#quoteImageList').replaceChildren(...state.quoteImages.map(item => {
     const card = document.createElement('div');
     card.className = 'quote-library-item';
@@ -263,6 +314,158 @@ async function loadQuoteImages() {
   const data = await api('/api/quote-images');
   state.quoteImages = data.images;
   renderQuoteImages();
+}
+
+function categoryOption(category, selected, onChange, count = null) {
+  const label = document.createElement('label');
+  label.className = 'quote-category-option';
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.value = category.id;
+  input.checked = selected.has(category.id);
+  input.addEventListener('change', () => onChange(category.id, input.checked));
+  const name = document.createElement('span');
+  name.textContent = category.label;
+  label.append(input, name);
+  if (count !== null) {
+    const number = document.createElement('small');
+    number.textContent = String(count);
+    label.append(number);
+  }
+  return label;
+}
+
+function updateQuoteCategoryStatus() {
+  const chosen = [...state.selectedQuoteCategories];
+  const count = state.quoteKnowledge.filter(item => item.eligible &&
+    (!chosen.length || chosen.some(id => item.categories?.includes(id)))).length;
+  $('#quoteCategoryStatus').textContent = !state.quoteKnowledgeLoaded ? 'Đang tải kho triết lý…'
+    : count ? `${count} ý đủ nội dung trong ${chosen.length ? `${chosen.length} mảng đã chọn` : 'toàn bộ kho'}. Mỗi lượt rút nhiều ý để tạo 8 Quote.`
+      : 'Chưa có ý đủ nội dung trong mảng đã chọn. Hãy thêm ý mới hoặc chọn mảng khác.';
+  $('#quoteIdeaButton').disabled = !state.quoteKnowledgeLoaded || count === 0;
+}
+
+function renderQuoteCategories() {
+  const main = $('#quoteCategoryOptions');
+  main.replaceChildren(...state.quoteCategories.map(category => categoryOption(category,
+    state.selectedQuoteCategories, (id, checked) => {
+      if (checked) state.selectedQuoteCategories.add(id);
+      else state.selectedQuoteCategories.delete(id);
+      updateQuoteCategoryStatus();
+    }, state.quoteKnowledge.filter(item => item.eligible && item.categories?.includes(category.id)).length)));
+  const adding = $('#quoteKnowledgeCategoryOptions');
+  adding.replaceChildren(...state.quoteCategories.map(category => categoryOption(category,
+    state.newQuoteCategories, (id, checked) => {
+      if (checked) state.newQuoteCategories.add(id);
+      else state.newQuoteCategories.delete(id);
+    })));
+  updateQuoteCategoryStatus();
+}
+
+function renderQuoteKnowledge() {
+  const items = state.quoteKnowledge;
+  $('#quoteKnowledgeCount').textContent = `${items.length} ý trong kho`;
+  const list = $('#quoteKnowledgeList');
+  list.replaceChildren();
+  const key = value => String(value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/đ/gu, 'd');
+  const query = key($('#quoteKnowledgeSearch').value.trim());
+  const matches = query ? items.filter(item => key(item.content).includes(query)) : items;
+  const visible = matches.slice(0, 100);
+  $('#quoteKnowledgeMore').hidden = matches.length <= visible.length;
+  $('#quoteKnowledgeMore').textContent = `Đang hiện ${visible.length}/${matches.length} ý. Nhập từ khóa để tìm ý khác.`;
+  if (!matches.length) {
+    const empty = document.createElement('p');
+    empty.className = 'quote-knowledge-empty';
+    empty.textContent = items.length ? 'Không tìm thấy ý phù hợp.' : 'Kho đang trống. Thêm một ý để bắt đầu.';
+    list.append(empty);
+  }
+  for (const item of visible) {
+    const row = document.createElement('div');
+    row.className = 'quote-knowledge-row';
+    row.dataset.id = item.id;
+    const content = document.createElement('p');
+    content.textContent = item.content;
+    const meta = document.createElement('span');
+    meta.className = 'quote-knowledge-meta';
+    meta.textContent = `${(item.categories || []).map(id => state.quoteCategories.find(category => category.id === id)?.label || id).join(' · ')}${item.eligible ? '' : ' · Ý ngắn, không dùng khi tạo ngẫu nhiên'}`;
+    const copy = document.createElement('div');
+    copy.className = 'quote-knowledge-copy';
+    copy.append(content, meta);
+    const actions = document.createElement('div');
+    actions.className = 'quote-knowledge-row-actions';
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.textContent = 'Sửa';
+    edit.addEventListener('click', () => {
+      const field = document.createElement('textarea');
+      field.className = 'quote-knowledge-edit';
+      field.value = item.content;
+      field.rows = 3;
+      field.maxLength = 2000;
+      const editCategories = new Set(item.categories || []);
+      const categoryField = document.createElement('fieldset');
+      categoryField.className = 'quote-category-field quote-category-field-small';
+      const legend = document.createElement('legend');
+      legend.textContent = 'Mảng nội dung';
+      const options = document.createElement('div');
+      options.className = 'quote-category-options';
+      options.append(...state.quoteCategories.map(category => categoryOption(category, editCategories,
+        (id, checked) => {
+          if (checked) editCategories.add(id);
+          else editCategories.delete(id);
+        })));
+      categoryField.append(legend, options);
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.textContent = 'Lưu';
+      save.addEventListener('click', async () => {
+        try {
+          if (!editCategories.size) throw new Error('Hãy chọn ít nhất một mảng nội dung cho ý này.');
+          const data = await api(`/api/quote-knowledge/${item.id}`, {method: 'PATCH',
+            body: JSON.stringify({content: field.value, categories: [...editCategories]})});
+          state.quoteKnowledge = state.quoteKnowledge.map(current => current.id === item.id ? data.item : current);
+          renderQuoteKnowledge();
+          renderQuoteCategories();
+          $('#quoteKnowledgeStatus').textContent = 'Đã cập nhật ý trong kho.';
+        } catch (error) { showError(error); }
+      });
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = 'Hủy';
+      cancel.addEventListener('click', renderQuoteKnowledge);
+      row.classList.add('editing');
+      const editActions = document.createElement('div');
+      editActions.className = 'quote-knowledge-row-actions';
+      editActions.append(save, cancel);
+      row.replaceChildren(field, categoryField, editActions);
+      field.focus();
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = 'Xóa';
+    remove.addEventListener('click', async () => {
+      if (!window.confirm('Xóa ý này khỏi kho triết lý?')) return;
+      try {
+        await api(`/api/quote-knowledge/${item.id}`, {method: 'DELETE'});
+        state.quoteKnowledge = state.quoteKnowledge.filter(current => current.id !== item.id);
+        renderQuoteKnowledge();
+        renderQuoteCategories();
+        $('#quoteKnowledgeStatus').textContent = 'Đã xóa ý khỏi kho.';
+      } catch (error) { showError(error); }
+    });
+    actions.append(edit, remove);
+    row.append(copy, actions);
+    list.append(row);
+  }
+}
+
+async function loadQuoteKnowledge() {
+  const data = await api('/api/quote-knowledge');
+  state.quoteKnowledge = data.items;
+  state.quoteCategories = data.categories;
+  state.quoteKnowledgeLoaded = true;
+  renderQuoteKnowledge();
+  renderQuoteCategories();
 }
 
 function selectQuoteMode(mode) {
@@ -473,7 +676,7 @@ async function autoInput({superMode = false} = {}) {
 }
 
 const superTime = value => new Date(value).toLocaleString('vi-VN', {dateStyle: 'short', timeStyle: 'short'});
-const superStatus = {active: 'Đang chạy', attention: 'Cần kiểm tra', stopped: 'Đã dừng',
+const superStatus = {active: 'Đang chạy', attention: 'Cần kiểm tra', stopped: 'Đã dừng', completed: 'Hoàn tất', waiting: 'Chờ tạo',
   planning: 'Đang tìm chủ đề · Chưa đăng', producing: 'Đang tạo video · Chưa đăng',
   manual_review: 'Chờ bổ sung footage · Chưa đăng',
   scheduled: 'Chờ giờ đăng · Chưa đăng', publishing: 'Đang gửi bài', sent: 'Đã đăng',
@@ -500,7 +703,7 @@ async function retrySuperAutoItem(campaign, item, button) {
     const {campaigns} = await api(`/api/super-auto/${encodeURIComponent(campaign.id)}/items/${encodeURIComponent(item.id)}/retry`,
       {method: 'POST'});
     renderSuperCampaigns(campaigns);
-    const {sessions} = await api('/api/sessions');
+    const {sessions} = await api(`/api/sessions?kind=${state.workspace}`);
     renderActivity(sessions, campaigns);
   } catch (error) {
     button.disabled = false;
@@ -521,7 +724,7 @@ async function retryAllFailedSuperAuto(campaign, button) {
     });
     renderSuperCampaigns(result.campaigns);
     button.textContent = `Đã xếp ${result.queued} video`;
-    const {sessions} = await api('/api/sessions');
+    const {sessions} = await api(`/api/sessions?kind=${state.workspace}`);
     renderActivity(sessions, result.campaigns);
   } catch (error) {
     button.disabled = false;
@@ -564,17 +767,17 @@ async function openSuperAutoFootage(campaign, item, button) {
 }
 
 function renderSuperCampaigns(campaigns) {
+  campaigns = campaigns.filter(campaign => campaign.template === state.workspace);
   const list = $('#superCampaigns');
   list.replaceChildren();
-  const busy = campaigns.some(campaign => ['active', 'attention'].includes(campaign.status));
-  $('#superStartButton').disabled = busy;
+  $('#superStartButton').disabled = false;
   if (!campaigns.length) {
     const empty = document.createElement('p');
     empty.textContent = 'Chưa có chiến dịch Super Auto.';
     list.append(empty);
     return;
   }
-  for (const campaign of campaigns.slice(0, 3)) {
+  for (const campaign of campaigns) {
     const section = document.createElement('section');
     section.className = 'super-campaign';
     const heading = document.createElement('div');
@@ -582,14 +785,16 @@ function renderSuperCampaigns(campaigns) {
     title.textContent = `${superStatus[campaign.status]} · ${campaign.template === 'quote' ? 'Quote' : 'Ranking'}`;
     heading.append(title);
     const detail = document.createElement('p');
-    detail.textContent = campaign.status === 'stopped'
-      ? `Đã dừng · khoảng cách đã đặt ${campaign.intervalMinutes} phút`
-      : `Bài tiếp theo: từ ${superTime(campaign.nextAt)} · cách nhau tối thiểu ${campaign.intervalMinutes} phút`;
+    detail.textContent = campaign.videoLimit
+      ? `${campaign.videoLimit} video theo lịch riêng · cách nhau tối thiểu ${campaign.intervalMinutes} phút`
+      : campaign.status === 'stopped'
+        ? `Đã dừng · khoảng cách đã đặt ${campaign.intervalMinutes} phút`
+        : `Bài tiếp theo: từ ${superTime(campaign.nextAt)} · cách nhau tối thiểu ${campaign.intervalMinutes} phút`;
     section.append(heading, detail);
     const totals = document.createElement('p');
     const c = campaign.counts;
     const retryPending = campaign.items.filter(item => item.retryRequested).length;
-    totals.textContent = `${c.sent} bài đã đăng · ${c.producing} đang tạo · ${c.scheduled} chờ giờ đăng · ${c.publishing} đang đăng` +
+    totals.textContent = `${c.sent} bài đã đăng · ${c.waiting || 0} chờ tạo · ${c.producing} đang tạo · ${c.scheduled} chờ giờ đăng · ${c.publishing} đang đăng` +
       `${c.manualReview ? ` · ${c.manualReview} chờ footage` : ''}` +
       `${retryPending ? ` · ${retryPending} chờ Retry` : ''}${c.failed ? ` · ${c.failed} lỗi` : ''}`;
     section.append(totals);
@@ -598,7 +803,8 @@ function renderSuperCampaigns(campaigns) {
       error.textContent = campaign.error;
       section.append(error);
     }
-    if (c.failed && !retryPending && c.producing + (c.manualReview || 0) + c.scheduled + c.publishing === 0) {
+    if (c.failed && !retryPending && c.producing === 0 &&
+        (campaign.videoLimit || (c.manualReview || 0) + c.scheduled + c.publishing === 0)) {
       const retryAll = document.createElement('button');
       retryAll.type = 'button';
       retryAll.className = 'mini-button';
@@ -608,7 +814,7 @@ function renderSuperCampaigns(campaigns) {
     }
     if (campaign.items.length) {
       const items = document.createElement('ul');
-      const visibleItems = campaign.items.filter((item, index) => index < 5 ||
+      const visibleItems = campaign.videoLimit ? campaign.items : campaign.items.filter((item, index) => index < 5 ||
         ['failed', 'manual_review', 'needs_review'].includes(item.status));
       for (const item of visibleItems) {
         const row = document.createElement('li');
@@ -616,12 +822,12 @@ function renderSuperCampaigns(campaigns) {
         const main = document.createElement('div');
         main.className = 'super-item-main';
         const label = document.createElement('strong');
-        label.textContent = item.topic || 'Đang tìm chủ đề';
+        label.textContent = `${item.slotIndex ? `Video ${item.slotIndex} · ` : ''}${item.topic || (item.status === 'waiting' ? 'Chờ tạo' : 'Đang tìm chủ đề')}`;
         const platforms = item.postResults ? Object.entries(item.postResults)
           .map(([key, result]) => `${publishLabels[key] || key}: ${result.state === 'published' ? 'đã đăng' : result.state === 'ready' ? 'đã tải lên' : result.state === 'failed' ? 'lỗi' : result.state === 'interrupted' ? 'cần kiểm tra' : 'đang xử lý'}`).join(' · ') : '';
         const meta = document.createElement('span');
         meta.textContent = `${item.retryRequested ? 'Đã xếp hàng Retry · Chưa đăng' : superStatus[item.status] || item.status}` +
-          `${item.status === 'scheduled' ? ` lúc ${superTime(item.scheduledAt)}` : ''}` +
+          ` · dự kiến ${superTime(item.scheduledAt)}` +
           `${platforms ? ` · ${platforms}` : ''}`;
         main.append(label, meta);
         for (const message of superItemErrors(item)) {
@@ -652,7 +858,7 @@ function renderSuperCampaigns(campaigns) {
           repair.addEventListener('click', () => void openSuperAutoFootage(campaign, item, repair));
           actions.append(repair);
         }
-        if (canRetry && c.producing + (c.manualReview || 0) + c.scheduled + c.publishing === 0) {
+        if (canRetry && c.producing === 0 && (campaign.videoLimit || (c.manualReview || 0) + c.scheduled + c.publishing === 0)) {
           const retry = document.createElement('button');
           retry.type = 'button';
           retry.className = 'mini-button';
@@ -697,7 +903,8 @@ function renderSuperCampaigns(campaigns) {
 }
 
 async function refreshSuperCampaigns() {
-  const [{sessions}, {campaigns}] = await Promise.all([api('/api/sessions'), api('/api/super-auto')]);
+  const [{sessions}, {campaigns}] = await Promise.all([api(`/api/sessions?kind=${state.workspace}`),
+    api(`/api/super-auto?kind=${state.workspace}`)]);
   renderSuperCampaigns(campaigns);
   renderActivity(sessions, campaigns);
 }
@@ -944,7 +1151,7 @@ function renderFootage() {
   if (!item?.footage) return;
   $('#footageTitle').textContent = item.title;
   $('#footageIntro').textContent = item.template === 'quote'
-    ? `Video ${item.duration} giây dùng đúng một ảnh. Ảnh đã được chọn ngẫu nhiên; bạn có thể đổi trước khi render.`
+    ? `Chọn bao nhiêu ảnh tùy ý. Video ${item.duration} giây sẽ tự chia đều thời lượng và chuyển lần lượt qua các ảnh đã chọn.`
     : item.manualSuperReview
       ? 'Bổ sung MP4 cho đúng video Super Auto này, sau đó chọn 8–20 clip. Thứ tự chọn là thứ tự cắt cảnh trong video.'
       : 'Xem từng clip, chọn 8–20 clip khác nhau. Thứ tự chọn là thứ tự cắt cảnh trong video.';
@@ -956,7 +1163,7 @@ function renderFootage() {
     return acc;
   }, {})).map(([name, count]) => `${name} ${count}`);
   $('#footageSources').textContent = item.template === 'quote'
-    ? `${candidates.length} ảnh trong kho Quote${candidates.length ? ' · chọn một ảnh' : ' · upload ảnh để bắt đầu'}`
+    ? `${candidates.length} ảnh trong kho Quote${candidates.length ? ' · chọn tùy ý, video tự sắp xếp theo thứ tự chọn' : ' · upload ảnh để bắt đầu'}`
     : `${candidates.length} clip gợi ý · ${counts.join(' · ') || 'Thêm MP4 local để bắt đầu'}`;
   const warning = item.footage.warnings || [];
   $('#footageWarning').hidden = warning.length === 0;
@@ -996,14 +1203,16 @@ function renderFootage() {
       : `${candidate.provider} · ${candidate.duration ? `${Math.round(candidate.duration)} giây · ` : ''}${candidate.width && candidate.height ? `${candidate.width} × ${candidate.height}` : 'MP4 local'}`;
     const description = document.createElement('p');
     description.className = 'footage-description';
-    description.textContent = item.template === 'quote' ? 'Một ảnh nền xuyên suốt video' : candidate.description || candidate.query;
+    description.textContent = item.template === 'quote'
+      ? (state.reviewSelections.has(candidate.id) ? `Ảnh ${[...state.reviewSelections].indexOf(candidate.id) + 1} trong video` : 'Chọn ảnh này cho video')
+      : candidate.description || candidate.query;
     copy.append(heading, meta, description);
     const actions = document.createElement('div');
     actions.className = 'footage-card-actions';
     const select = makeAction(state.reviewSelections.has(candidate.id) ? 'Đã chọn' : item.template === 'quote' ? 'Chọn ảnh' : 'Chọn clip',
       state.reviewSelections.has(candidate.id) ? 'mini-button primary' : 'mini-button', () => {
         if (state.reviewSelections.has(candidate.id)) state.reviewSelections.delete(candidate.id);
-        else if (item.template === 'quote') { state.reviewSelections.clear(); state.reviewSelections.add(candidate.id); }
+        else if (item.template === 'quote') state.reviewSelections.add(candidate.id);
         else if (state.reviewSelections.size < 20) state.reviewSelections.add(candidate.id);
         renderFootage();
       });
@@ -1036,11 +1245,11 @@ function updateFootageSelection() {
   const target = item?.footage?.requiredClips || 8;
   const minimum = item?.template === 'quote' ? target : 8;
   $('#footageHint').textContent = item?.template === 'quote'
-    ? count === 1 ? 'Đã chọn một ảnh. Sẵn sàng render.' : 'Hãy chọn một ảnh hoặc upload vào kho Quote.'
+    ? count ? `Đã chọn ${count} ảnh. Video sẽ tự chia đều thời lượng theo thứ tự chọn.` : 'Hãy chọn ít nhất một ảnh hoặc upload vào kho Quote.'
     : count < minimum ? `Đã chọn ${count}/${minimum} clip cần cho video này. Có thể upload MP4 để bổ sung.`
       : `Đã chọn ${count} clip. Sẵn sàng render.`;
-  $('#confirmFootage').textContent = item?.template === 'quote' ? 'Render với ảnh đã chọn' : 'Tải clip đã chọn và render';
-  $('#confirmFootage').disabled = item?.template === 'quote' ? count !== 1 : count < minimum || count > 20;
+  $('#confirmFootage').textContent = item?.template === 'quote' ? `Render với ${count} ảnh đã chọn` : 'Tải clip đã chọn và render';
+  $('#confirmFootage').disabled = item?.template === 'quote' ? count < 1 : count < minimum || count > 20;
 }
 
 function createResultCard(item) {
@@ -1189,10 +1398,11 @@ function publicationPlatformCell(item, platform) {
     error.textContent = message;
     cell.append(error);
   }
-  if (stateName === 'none' || stateName === 'failed') {
-    const action = makeAction(stateName === 'failed' ? 'Thử lại' : 'Đăng',
+  if (stateName === 'none' || stateName === 'failed' || stateName === 'interrupted') {
+    const retry = stateName !== 'none';
+    const action = makeAction(retry ? 'Thử lại' : 'Đăng',
       'mini-button publishing-action', () => openPublish(item, platform));
-    action.setAttribute('aria-label', `${stateName === 'failed' ? 'Thử lại' : 'Đăng'} ${publishLabels[platform]}: ${item.title}`);
+    action.setAttribute('aria-label', `${retry ? 'Thử lại' : 'Đăng'} ${publishLabels[platform]}: ${item.title}`);
     cell.append(action);
   }
   return cell;
@@ -1263,7 +1473,7 @@ async function markOutput(item, status) {
 }
 
 function applyOutputs(outputs) {
-  state.recentOutputs = outputs || [];
+  state.recentOutputs = (outputs || []).filter(item => item.template === state.workspace);
   for (const item of state.queue) {
     const saved = state.recentOutputs.find(output => output.outputUrl === item.outputUrl);
     if (saved) Object.assign(item, {publicationStatus: saved.publicationStatus,
@@ -1278,7 +1488,7 @@ function applyOutputs(outputs) {
 }
 
 async function refreshOutputs() {
-  const {outputs} = await api('/api/outputs');
+  const {outputs} = await api(`/api/outputs?kind=${state.workspace}`);
   applyOutputs(outputs);
 }
 
@@ -1550,7 +1760,10 @@ function campaignRow(campaign, openIds) {
   title.textContent = `Super Auto · ${campaign.template === 'quote' ? 'Quote' : 'Ranking'}`;
   const next = document.createElement('small');
   next.textContent = campaign.status === 'active'
-    ? `Bài tiếp theo từ ${superTime(campaign.nextAt)}` : campaign.error || 'Chiến dịch đã dừng';
+    ? campaign.videoLimit
+      ? `${campaign.counts.sent}/${campaign.videoLimit} đã đăng · ${campaign.counts.waiting} chờ tạo`
+      : `Bài tiếp theo từ ${superTime(campaign.nextAt)}`
+    : campaign.error || (campaign.status === 'completed' ? 'Đã hoàn tất lịch đăng' : 'Chiến dịch đã dừng');
   copy.append(title, next);
   const badge = document.createElement('span');
   badge.className = `job-badge ${campaign.status}`;
@@ -1559,14 +1772,14 @@ function campaignRow(campaign, openIds) {
   const counts = document.createElement('p');
   counts.className = 'session-counts';
   const c = campaign.counts;
-  counts.textContent = `${c.sent} bài đã gửi · ${c.producing} đang tạo · ${c.scheduled} chờ giờ đăng · ${c.publishing} đang đăng` +
+  counts.textContent = `${c.sent} bài đã gửi · ${c.waiting || 0} chờ tạo · ${c.producing} đang tạo · ${c.scheduled} chờ giờ đăng · ${c.publishing} đang đăng` +
     `${c.failed ? ` · ${c.failed} lỗi` : ''}${c.needsReview ? ` · ${c.needsReview} cần kiểm tra` : ''}`;
   const items = document.createElement('ul');
   items.className = 'session-items';
   for (const item of campaign.items.slice(0, 5)) {
     const line = document.createElement('li');
     const name = document.createElement('span');
-    name.textContent = item.topic || 'Đang tìm chủ đề';
+    name.textContent = `${item.slotIndex ? `Video ${item.slotIndex} · ` : ''}${item.topic || (item.status === 'waiting' ? 'Chờ tạo' : 'Đang tìm chủ đề')}`;
     const status = document.createElement('span');
     status.textContent = superStatus[item.status] || item.status;
     const errors = superItemErrors(item);
@@ -1587,6 +1800,8 @@ function campaignRow(campaign, openIds) {
 }
 
 function renderActivity(sessions, campaigns) {
+  sessions = sessions.filter(session => session.template === state.workspace);
+  campaigns = campaigns.filter(campaign => campaign.template === state.workspace);
   const openIds = new Set($$('.session-row[open]').map(row => row.dataset.id));
   const activeSessions = sessions.filter(session => ['running', 'queued', 'paused', 'pausing'].includes(session.status));
   const activeCampaigns = campaigns.filter(campaign => campaign.status === 'active');
@@ -1746,6 +1961,9 @@ async function openPublish(item, selectedPlatform = null) {
   $('#publishForm').hidden = false;
   $('#publishStatus').hidden = true;
   $('#publishForm').reset();
+  $('#publishInterruptedCheck').hidden = true;
+  $('#publishInterruptedCheck').dataset.platforms = '';
+  $('#publishInterruptedConsent').required = false;
   $('#tiktokPrivacy').replaceChildren();
   setTikTokConnection('Chọn TikTok để kiểm tra tài khoản và quyền đăng.');
   $('#publishFile').textContent = item.title;
@@ -1812,6 +2030,15 @@ async function updatePublishOptions(force = false) {
   const request = ++state.tiktokCreatorRequest;
   clearPublishError();
   const chosen = new Set($$('input[name="platform"]:checked').map(input => input.value));
+  const interrupted = [...chosen].filter(platform =>
+    platformPublication(state.publishItem, platform)?.result?.state === 'interrupted');
+  const interruptedKey = interrupted.join(',');
+  const interruptedConsent = $('#publishInterruptedConsent');
+  if ($('#publishInterruptedCheck').dataset.platforms !== interruptedKey) interruptedConsent.checked = false;
+  $('#publishInterruptedCheck').dataset.platforms = interruptedKey;
+  $('#publishInterruptedCheck').hidden = interrupted.length === 0;
+  interruptedConsent.required = interrupted.length > 0;
+  $('#publishInterruptedPlatforms').textContent = interrupted.map(platform => publishLabels[platform]).join(', ');
   for (const platform of Object.keys(publishLabels)) {
     $(`#${platform}Copy`).hidden = !chosen.has(platform);
     $$(`#${platform}Copy input, #${platform}Copy textarea`).forEach(field => {
@@ -1906,7 +2133,10 @@ async function pollPost(refresh = false) {
     const {post} = await api(`/api/posts/${encodeURIComponent(state.postId)}${refresh ? '?refresh=1' : ''}`);
     renderPost(post);
     await refreshOutputs();
-    if (Object.values(post.results).every(result => !['queued', 'uploading'].includes(result.state))) {
+    const pending = Object.values(post.results).some(result =>
+      ['queued', 'uploading', 'processing', 'verifying'].includes(result.state) ||
+      result.provider === 'zernio' && result.state === 'published' && !result.url);
+    if (!pending) {
       clearInterval(state.postPolling);
       state.postPolling = null;
     }
@@ -1959,7 +2189,7 @@ async function pollQueue() {
 function resetApp() {
   if (state.polling) clearInterval(state.polling);
   if (state.postPolling) clearInterval(state.postPolling);
-  Object.assign(state, {template: 'ranking', quoteMode: 'caption', runId: null, ideas: [], selectedIdeas: new Set(), queue: [],
+  Object.assign(state, {template: state.workspace, quoteMode: 'caption', runId: null, ideas: [], selectedIdeas: new Set(), queue: [],
     queueStatus: null, queueCanPause: false, queueActionPending: false, currentStage: 'topic', maxStage: 0, polling: null, activeResultId: null,
     reviewJobId: null, reviewSelections: new Set(), publishItem: null, publishSelectedPlatform: null,
     postId: null, postPolling: null,
@@ -1967,6 +2197,7 @@ function resetApp() {
     tiktokCreatorRequest: state.tiktokCreatorRequest + 1, publishProvider: 'direct', savedOutput: null,
     autoConfig: null, autoConfigPromise: null, autoCreatorRequest: state.autoCreatorRequest + 1});
   $('#topicForm').reset();
+  if (state.workspace === 'quote') renderQuoteCategories();
   $('#autoModeToggle').checked = false;
   $('#autoModeToggle').setAttribute('aria-expanded', 'false');
   $('#autoModeSettings').hidden = true;
@@ -1990,12 +2221,15 @@ function resetApp() {
   $('#videoPreview').hidden = true;
   $('#previewEmpty').hidden = false;
   $('#previewStatus').textContent = 'Chờ nội dung';
-  setRunSummary('Nhập chủ đề để bắt đầu một phiên sản xuất mới.');
+  setRunSummary(state.workspace === 'quote'
+    ? 'Chọn mảng nội dung để hệ thống rút ý ngẫu nhiên từ kho và tạo 8 Quote.'
+    : 'Nhập chủ đề để bắt đầu một phiên sản xuất mới.');
   clearError();
   selectQuoteMode('caption');
-  selectTemplate('ranking');
+  selectTemplate(state.workspace);
   setStage('topic');
-  $('#topicInput').focus();
+  if (state.workspace === 'quote') $('#quoteCategoryOptions input')?.focus();
+  else $('#topicInput').focus();
 }
 
 function requestNewRun() {
@@ -2017,6 +2251,28 @@ function updateAutoStatus() {
 
 $('#topicInput').addEventListener('input', event => {
   $('#charCount').textContent = `${event.target.value.length} / 300`;
+});
+
+$('#quoteKnowledgeSearch').addEventListener('input', renderQuoteKnowledge);
+
+$('#quoteKnowledgeForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const field = $('#quoteKnowledgeInput');
+  const items = field.value.split(/\r?\n/u).map(value => value.trim()).filter(Boolean);
+  if (!items.length) { $('#quoteKnowledgeStatus').textContent = 'Hãy nhập ít nhất một ý.'; return; }
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  button.disabled = true;
+  $('#quoteKnowledgeStatus').textContent = 'Đang lưu…';
+  try {
+    const data = await api('/api/quote-knowledge', {method: 'POST',
+      body: JSON.stringify({items, categories: [...state.newQuoteCategories]})});
+    state.quoteKnowledge = data.items;
+    field.value = '';
+    renderQuoteKnowledge();
+    renderQuoteCategories();
+    $('#quoteKnowledgeStatus').textContent = `Đã lưu ${data.added.length} ý mới${items.length > data.added.length ? '; các ý trùng đã được bỏ qua' : ''}.`;
+  } catch (error) { $('#quoteKnowledgeStatus').textContent = error.message; }
+  finally { button.disabled = false; }
 });
 
 $('#autoModeToggle').addEventListener('change', async event => {
@@ -2042,7 +2298,7 @@ $('#topicForm').addEventListener('submit', async event => {
   event.preventDefault();
   clearError();
   const prompt = $('#topicInput').value.trim();
-  if (prompt.length < 3) {
+  if (state.template !== 'quote' && prompt.length < 3) {
     showError('Hãy nhập chủ đề có ít nhất 3 ký tự.');
     return;
   }
@@ -2051,7 +2307,9 @@ $('#topicForm').addEventListener('submit', async event => {
     : 'Gemini đang tìm các góc nội dung có dữ liệu mới…');
   try {
     const data = await api('/api/ideas', {method: 'POST',
-      body: JSON.stringify({prompt, template: state.template, mode: state.template === 'quote' ? state.quoteMode : null})});
+      body: JSON.stringify({prompt: state.template === 'quote' ? '' : prompt,
+        categories: state.template === 'quote' ? [...state.selectedQuoteCategories] : undefined,
+        template: state.template, mode: state.template === 'quote' ? state.quoteMode : null})});
     state.runId = data.runId;
     state.ideas = data.ideas;
     state.selectedIdeas = new Set();
@@ -2059,7 +2317,7 @@ $('#topicForm').addEventListener('submit', async event => {
     renderIdeas();
     updateIdeasIntro();
     setRunSummary(state.template === 'quote'
-      ? `${state.ideas.length} Quote nguyên bản đã sẵn sàng. Có thể chọn nhiều video.`
+      ? `${state.ideas.length} Quote đã sẵn sàng từ ${data.knowledgeSources?.length || 0} ý ngẫu nhiên trong kho. Có thể chọn nhiều video.`
       : `${state.ideas.length} góc nội dung đã sẵn sàng. Có thể chọn nhiều video.`);
     $('#previewStatus').textContent = 'Đã có ý tưởng';
     setStage('ideas');
@@ -2082,7 +2340,7 @@ async function enqueueSelected(automatic = null) {
     $('#queueIntro').textContent = automatic
       ? `Auto mode đang ${state.template === 'quote' ? 'chọn ảnh từ kho' : 'lấy footage'}, render và đăng từng video lên các nền tảng đã chọn.`
       : state.template === 'quote'
-        ? 'Mỗi video dùng một ảnh chọn ngẫu nhiên từ kho. Bạn có thể duyệt và đổi ảnh trước khi render.'
+        ? 'Auto mode chọn hai ảnh từ kho. Ở chế độ thủ công, chọn bao nhiêu ảnh tùy ý; video tự chia đều thời lượng và chuyển ảnh.'
         : 'Mỗi video được chuẩn bị nội dung và tìm footage rồi chờ bạn duyệt clip trước khi render. Chỉ một tác vụ chạy tại một thời điểm.';
     state.maxStage = 2;
     setStage('queue');
@@ -2115,6 +2373,12 @@ $('#publishForm').addEventListener('submit', async event => {
   if (!state.publishItem) return;
   const chosen = $$('input[name="platform"]:checked').map(input => input.value);
   if (!chosen.length) { showPublishError('Hãy chọn ít nhất một nền tảng.'); return; }
+  const interrupted = chosen.filter(platform =>
+    platformPublication(state.publishItem, platform)?.result?.state === 'interrupted');
+  if (interrupted.length && !$('#publishInterruptedConsent').checked) {
+    showPublishError(`Hãy kiểm tra ${interrupted.map(platform => publishLabels[platform]).join(', ')} chưa có bài đăng rồi xác nhận trước khi thử lại.`);
+    return;
+  }
   if (chosen.some(platform => state.publishPlatforms[platform]?.provider === 'zernio' && !$(`#${platform}Account`).value)) {
     showPublishError('Hãy chọn tài khoản Zernio cho từng nền tảng.'); return;
   }
@@ -2142,12 +2406,12 @@ $('#publishForm').addEventListener('submit', async event => {
   $('#publishSubmit').disabled = true;
   try {
     const {post} = await api('/api/posts', {method: 'POST', body: JSON.stringify({outputName, targets,
-      consent: $('#publishConsent').checked})});
+      consent: $('#publishConsent').checked, confirmInterrupted: interrupted.length > 0 && $('#publishInterruptedConsent').checked})});
     state.postId = post.id;
     $('#publishForm').hidden = true;
     renderPost(post);
     if (state.postPolling) clearInterval(state.postPolling);
-    state.postPolling = setInterval(pollPost, 1500);
+    state.postPolling = setInterval(() => pollPost(true), 1500);
     await pollPost();
   } catch (error) { showPublishError(error); }
   finally { $('#publishSubmit').disabled = false; }
@@ -2174,7 +2438,7 @@ $('#recoverButton').addEventListener('click', async () => {
 $('#backToQueue').addEventListener('click', () => setStage('queue'));
 $('#confirmFootage').addEventListener('click', async () => {
   const reviewing = state.queue.find(job => job.id === state.reviewJobId);
-  if (!reviewing || (reviewing.template === 'quote' ? state.reviewSelections.size !== 1 : state.reviewSelections.size < 8)) return;
+  if (!reviewing || (reviewing.template === 'quote' ? state.reviewSelections.size < 1 : state.reviewSelections.size < 8)) return;
   clearError();
   $('#confirmFootage').disabled = true;
   try {
@@ -2244,6 +2508,7 @@ $$('.workflow-step').forEach(step => {
 
 $$('a[data-page]').forEach(link => link.addEventListener('click', event => {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (['home', 'flow'].includes(link.dataset.page)) return;
   event.preventDefault();
   setPage(link.dataset.page);
 }));
@@ -2285,7 +2550,7 @@ function renderMusic() {
       const previous = track.weight;
       select.disabled = true;
       try {
-        await api(`/api/music/${encodeURIComponent(track.name)}`, {
+        await api(`/api/music/${encodeURIComponent(track.name)}?kind=${state.workspace}`, {
           method: 'PATCH', body: JSON.stringify({weight: Number(select.value)}),
         });
         track.weight = Number(select.value);
@@ -2304,7 +2569,7 @@ function renderMusic() {
       if (!window.confirm(`Xóa "${track.name}" khỏi kho nhạc?`)) return;
       remove.disabled = true;
       try {
-        await api(`/api/music/${encodeURIComponent(track.name)}`, {method: 'DELETE'});
+        await api(`/api/music/${encodeURIComponent(track.name)}?kind=${state.workspace}`, {method: 'DELETE'});
         state.musicTracks = state.musicTracks.filter(item => item.name !== track.name);
         $('#musicStatus').textContent = `Đã xóa ${track.name}.`;
         renderMusic();
@@ -2317,7 +2582,7 @@ function renderMusic() {
 }
 
 async function refreshMusic() {
-  const {tracks} = await api('/api/music');
+  const {tracks} = await api(`/api/music?kind=${state.workspace}`);
   state.musicTracks = tracks;
   renderMusic();
 }
@@ -2331,7 +2596,7 @@ async function uploadMusicFiles(files) {
   for (const file of files) {
     $('#musicStatus').textContent = `Đang thêm ${file.name} (${added + failures.length + 1}/${files.length})…`;
     try {
-      await api('/api/music', {method: 'POST', body: file,
+      await api(`/api/music?kind=${state.workspace}`, {method: 'POST', body: file,
         headers: {'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name)}});
       added++;
     } catch (error) { failures.push(`${file.name}: ${error.message}`); }
@@ -2344,17 +2609,23 @@ async function uploadMusicFiles(files) {
 
 function openCurrentPath() {
   const path = window.location.pathname.replace(/\/$/, '') || '/';
-  if (path === '/automation') return setPage('automation', {history: false});
+  if (path === '/') return setPage('home', {history: false});
   if (path === '/flow') return setPage('flow', {history: false});
-  if (path === '/publishing') return setPage('publishing', {history: false});
-  if (path === '/library') return setPage('library', {history: false});
-  if (path === '/music') return setPage('music', {history: false});
-  if (path.startsWith('/create')) {
-    const requested = Object.keys(stagePaths).find(stage => stagePaths[stage] === path) || 'topic';
-    const stage = stageOrder.indexOf(requested) <= state.maxStage ? requested : 'topic';
-    return setStage(stage, {history: path !== stagePaths[stage], replace: true});
+  const workspace = path.split('/')[1];
+  if (workspace !== 'ranking' && workspace !== 'quote') return setPage('home', {history: true, replace: true});
+  if (workspace !== state.workspace) return window.location.assign(path);
+  selectTemplate(workspace);
+  if (path === workspacePath()) return setPage('overview', {history: false});
+  for (const page of ['automation', 'publishing', 'library', 'music']) {
+    if (path === pagePaths()[page]) return setPage(page, {history: false});
   }
-  setPage('overview', {history: path !== '/', replace: true});
+  if (path.startsWith(workspacePath('create'))) {
+    const paths = stagePaths();
+    const requested = Object.keys(paths).find(stage => paths[stage] === path) || 'topic';
+    const stage = stageOrder.indexOf(requested) <= state.maxStage ? requested : 'topic';
+    return setStage(stage, {history: path !== paths[stage], replace: true});
+  }
+  setPage('overview', {history: true, replace: true});
 }
 
 window.addEventListener('popstate', openCurrentPath);
@@ -2394,8 +2665,37 @@ $('#previewDialog').addEventListener('close', () => {
 
 const firstPost = new Date(Date.now() + 30 * 60_000);
 firstPost.setMinutes(Math.ceil(firstPost.getMinutes() / 15) * 15, 0, 0);
-$('#superStartAt').value = new Date(firstPost.getTime() - firstPost.getTimezoneOffset() * 60_000)
+const localDateTime = date => new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
   .toISOString().slice(0, 16);
+$('#superStartAt').value = localDateTime(firstPost);
+function fillSuperSchedule({preserve = false} = {}) {
+  const count = Number($('#superVideoLimit').value);
+  const list = $('#superSchedule');
+  if (!Number.isInteger(count) || count < 1 || count > 30) { list.replaceChildren(); return; }
+  const saved = preserve ? [...list.querySelectorAll('input')].map(input => input.value) : [];
+  const start = new Date($('#superStartAt').value);
+  const gap = Number($('#superInterval').value) * 60_000;
+  list.replaceChildren();
+  for (let index = 0; index < count; index++) {
+    const label = document.createElement('label');
+    const name = document.createElement('span');
+    name.textContent = `Video ${index + 1}`;
+    const input = document.createElement('input');
+    input.type = 'datetime-local';
+    input.required = true;
+    input.dataset.superSlot = String(index + 1);
+    input.setAttribute('aria-label', `Giờ đăng video ${index + 1}`);
+    input.value = saved[index] || (Number.isFinite(start.getTime())
+      ? localDateTime(new Date(start.getTime() + index * gap)) : '');
+    label.append(name, input);
+    list.append(label);
+  }
+}
+$('#superVideoLimit').addEventListener('input', () => fillSuperSchedule({preserve: true}));
+$('#superStartAt').addEventListener('change', () => fillSuperSchedule());
+$('#superInterval').addEventListener('change', () => fillSuperSchedule());
+$('#superFillSchedule').addEventListener('click', () => fillSuperSchedule());
+fillSuperSchedule();
 $('#superStartButton').addEventListener('click', async () => {
   clearError();
   const button = $('#superStartButton');
@@ -2406,18 +2706,24 @@ $('#superStartButton').addEventListener('click', async () => {
     if (!auto) throw new Error('Hãy bật Auto mode và chọn nền tảng đăng trước khi chạy Super Auto.');
     const startAt = new Date($('#superStartAt').value);
     if (!Number.isFinite(startAt.getTime())) throw new Error('Hãy chọn giờ đăng bài đầu tiên.');
+    const publishTimes = [...$('#superSchedule').querySelectorAll('input')].map((input, index) => {
+      const time = new Date(input.value);
+      if (!Number.isFinite(time.getTime())) throw new Error(`Hãy chọn giờ đăng video ${index + 1}.`);
+      return time.toISOString();
+    });
     await api('/api/super-auto', {method: 'POST', body: JSON.stringify({
       template: $('#superTemplate').value,
       mode: $('#superTemplate').value === 'quote' ? 'caption' : null,
-      focus: $('#superFocus').value.trim(), startAt: startAt.toISOString(),
-      intervalMinutes: Number($('#superInterval').value), auto,
+      focus: $('#superFocus').value.trim(), startAt: publishTimes[0],
+      intervalMinutes: Number($('#superInterval').value),
+      videoLimit: Number($('#superVideoLimit').value), publishTimes, auto,
     })});
     await refreshSuperCampaigns();
   } catch (error) { showError(error); button.disabled = false; }
   finally { button.textContent = 'Bắt đầu Super Auto'; }
 });
 
-api('/api/config').then(config => {
+api(`/api/config?kind=${state.workspace === 'quote' ? 'quote' : 'ranking'}`).then(config => {
   const missing = [];
   if (!config.aiConfigured) missing.push(config.aiProvider === 'omnirouter' ? 'OmniRouter' : 'Gemini AI Studio');
   if (!config.providers?.some(provider => provider.enabled)) missing.push('Pixabay / Pexels / Coverr');
@@ -2434,10 +2740,11 @@ api('/api/config').then(config => {
   $('#systemState').lastElementChild.textContent = 'Không kết nối được server';
 });
 
-api('/api/recoverable').then(({runs}) => {
-  if (!runs?.length) return;
-  state.recoverId = runs[0].id;
-  $('#recoverTitle').textContent = runs[0].title;
+api(`/api/recoverable?kind=${state.workspace}`).then(({runs}) => {
+  const run = runs?.find(item => item.template === state.workspace);
+  if (!run) return;
+  state.recoverId = run.id;
+  $('#recoverTitle').textContent = run.title;
   $('#recoverRun').hidden = false;
 }).catch(() => {});
 

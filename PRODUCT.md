@@ -29,9 +29,11 @@ Chạy local trên Windows. Gemini tạo nội dung; Ranking tìm dữ liệu we
 ## Capabilities and Constraints
 
 - Giao diện và thông báo bằng tiếng Việt.
+- Menu tổng mở ba khu Ranking, Quote và Flow. Mỗi khu có đường dẫn và phiên riêng; Ranking và Quote dùng kho nhạc độc lập, Quote dùng kho ảnh Quote, Flow dùng kho tài nguyên thử đồ riêng.
 - PostgreSQL lưu video, tiến độ job và các lần đăng; MP4 vẫn nằm trong `output/`.
 - Ranking phải có ít nhất 10 dòng cùng chỉ số, đơn vị và kỳ; Quote phải là nội dung nguyên bản, không gắn tác giả.
-- Quote theo giọng lạnh, sắc và thực dụng về lãnh đạo, quyền quyết định, chọn người, cắt lỗ, lợi ích và trách nhiệm. Mỗi ý chỉ rõ hành động, hậu quả và người trả giá; tránh hướng chữa lành, nhân văn sách giáo khoa, danh ngôn trang trọng và khẩu hiệu rỗng. Mỗi video dùng đúng một ảnh chọn ngẫu nhiên từ kho ảnh upload, hook trên ảnh và caption có đúng 5 ý đánh số theo dạng quy tắc, phân tích hoặc cặp ưu tiên.
+- Quote theo giọng lạnh, sắc và thực dụng về lãnh đạo, quyền quyết định, chọn người, cắt lỗ, lợi ích và trách nhiệm. Mỗi ý chỉ rõ hành động, hậu quả và người trả giá; tránh hướng chữa lành, nhân văn sách giáo khoa, danh ngôn trang trọng và khẩu hiệu rỗng. Video thủ công dùng số ảnh tùy chọn từ kho upload, tự chia đều thời lượng và chuyển ảnh; Auto mode chọn ngẫu nhiên hai ảnh. Hook nằm trên ảnh và caption có đúng 5 ý đánh số theo dạng quy tắc, phân tích hoặc cặp ưu tiên.
+- Tạo Quote thủ công luôn rút ngẫu nhiên từ kho triết lý, có thể lọc đồng thời theo kinh doanh, chính trị, quản lý và các mảng khác. Không chọn mảng sẽ dùng toàn kho. Kho nhận ý mới liên tục, hỗ trợ sửa, xóa và gắn nhiều mảng; ý gốc được diễn đạt lại khi tạo 8 Quote.
 - Mỗi video phải vượt kiểm tra cấu trúc dữ liệu và đường dẫn nguồn trước khi render.
 - Hàng chờ chỉ chạy một video tại một thời điểm; lỗi của một video không chặn video tiếp theo.
 - API key chỉ tồn tại phía server local và không được gửi xuống trình duyệt.

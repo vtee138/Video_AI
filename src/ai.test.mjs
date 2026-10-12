@@ -216,6 +216,35 @@ test('OmniRouter uses its saved key, active model, and Chat Completions schema',
   }
 });
 
+test('OmniRouter retries with a live Antigravity Gemini model when the configured model disappears', async () => {
+  const originalFetch = globalThis.fetch;
+  const previousProvider = process.env.AI_PROVIDER;
+  const previousModel = process.env.OMNIROUTER_MODEL;
+  process.env.AI_PROVIDER = 'omnirouter';
+  process.env.OMNIROUTER_API_KEY = 'omni-test-key';
+  process.env.OMNIROUTER_GEMINI_BASE_URL = 'http://localhost:20128/v1beta';
+  process.env.OMNIROUTER_MODEL = 'antigravity/gemini-3.7-flash-tiered';
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({url, model: options?.body ? JSON.parse(options.body).model : null});
+    if (url.endsWith('/v1/models')) return new Response(JSON.stringify({data: [
+      {id: 'antigravity/gemini-3.6-flash-tiered'}, {id: 'antigravity/gemini-3.8-flash-tiered'},
+    ]}), {status: 200});
+    if (requests.length === 1) return new Response(JSON.stringify({error: {message:
+      "Model 'gemini-3.7-flash-tiered' is not available in the active live catalog for provider 'antigravity'."}}), {status: 400});
+    return new Response(JSON.stringify({choices: [{message: {content: JSON.stringify({title: 'Story'})}}]}), {status: 200});
+  };
+  try {
+    assert.equal((await writeStory({}, {}, [])).title, 'Story');
+    assert.deepEqual(requests.map(request => request.model),
+      ['antigravity/gemini-3.7-flash-tiered', null, 'antigravity/gemini-3.8-flash-tiered']);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.AI_PROVIDER = previousProvider;
+    process.env.OMNIROUTER_MODEL = previousModel;
+  }
+});
+
 test('OmniRouter searches planned queries before accepting research', async () => {
   const originalFetch = globalThis.fetch;
   const previousProvider = process.env.AI_PROVIDER;

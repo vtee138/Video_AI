@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d1117">
+  <title>Life Luxury · AI Video Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/luxury.css">
+</head>
+<body>
+  <header class="luxury-topbar">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 28 28"><path d="M5 21V9h4v12M12 21V4h4v17M19 21v-8h4v8M3 24h22"/></svg></span><span><strong>AI Video Studio</strong><small>Local video workspace</small></span></a>
+    <nav aria-label="Điều hướng Life Luxury"><a href="/">Menu tổng</a><a href="#conceptTitle" aria-current="page">Tạo video</a><a href="#footageTitle">Kho footage</a><a href="#musicTitle">Kho nhạc</a><a href="#historyTitle">Video đã tạo</a></nav>
+  </header>
+  <main class="luxury-main">
+    <div class="luxury-heading">
+      <div><h1>Life Luxury</h1><p>Video dọc 30 giây · 8 cảnh · không có chữ trên hình</p></div>
+      <span class="luxury-format">1080 × 1920 <span aria-hidden="true">/</span> 30 FPS</span>
+    </div>
+    <div class="luxury-layout">
+      <div class="luxury-editor">
+        <section class="luxury-intro" aria-labelledby="conceptTitle">
+          <h2 id="conceptTitle">The Billionaire Lifestyle</h2>
+          <p>Tải MP4 của bạn vào kho riêng theo chủ đề. Mỗi video chọn ngẫu nhiên 8 clip khác nhau từ kho đó, kết hợp nhạc và nhịp cắt; video xuất ra chỉ có hình và âm thanh.</p>
+          <button class="button primary" type="button" id="searchButton">Tạo bộ footage từ kho</button>
+          <p class="luxury-helper" id="searchStatus" role="status">Thêm footage vào kho bên dưới rồi tạo một phiên mới.</p>
+          <p class="luxury-helper" id="saveStatus" role="status">Các lựa chọn của phiên sẽ được lưu tự động.</p>
+          <div class="luxury-sessions"><h3>Phiên Luxury đã lưu</h3><div id="luxurySessions"><p>Đang tải phiên…</p></div></div>
+        </section>
+        <section class="luxury-footage" aria-labelledby="footageTitle">
+          <div class="luxury-section-head"><h2 id="footageTitle">Kho footage Luxury</h2><span>MP4 riêng · chọn ngẫu nhiên khi dựng</span></div>
+          <p>Phân clip vào đúng nhóm. Xe sang và skyline cần ít nhất 2 clip khác nhau; mỗi nhóm còn lại cần ít nhất 1. Clip dài tối thiểu 3,8 giây, tối đa 500 MB/file.</p>
+          <div class="luxury-footage-controls"><select id="footageCategory" aria-label="Nhóm footage"></select><label class="button ghost luxury-upload">Chọn nhiều MP4<input id="footageInput" type="file" accept=".mp4,video/mp4" multiple hidden></label></div>
+          <p class="luxury-helper" id="footageStatus" role="status">Chưa tải footage lên.</p>
+          <div id="footageLibrary" class="luxury-footage-library"></div>
+        </section>
+        <section class="luxury-music" aria-labelledby="musicTitle">
+          <div class="luxury-section-head"><h2 id="musicTitle">Kho nhạc Luxury</h2><span>Cherry Lady · không lời</span></div>
+          <p>Kho nhạc riêng cho Life Luxury; không lấy nhạc từ Ranking hay Quote. Tải bản nhạc bạn có quyền sử dụng lên đây, sau đó chọn bài để dựng. Nhạc phát xuyên suốt và giảm âm ở cuối video.</p>
+          <div class="luxury-music-controls"><select id="musicSelect" aria-label="Chọn nhạc nền"><option value="">Chưa có nhạc Luxury</option></select><label class="button ghost luxury-upload">Tải nhạc lên<input id="musicInput" type="file" accept=".mp3,.wav,.m4a,audio/*" hidden></label></div>
+          <audio id="musicPreview" controls preload="none" hidden></audio>
+        </section>
+        <section class="luxury-scenes" aria-labelledby="scenesTitle">
+          <div class="luxury-section-head"><h2 id="scenesTitle">Storyboard</h2><span>8 cảnh · 3,75 giây/cảnh · không chữ</span></div>
+          <div id="sceneList"></div>
+        </section>
+        <section class="luxury-export" aria-labelledby="exportTitle">
+          <h2 id="exportTitle">Xuất video</h2>
+          <p id="exportHint">Chọn đủ 8 clip và một bản nhạc không lời để bắt đầu render.</p>
+          <label class="luxury-post-caption">Caption bài đăng (không hiện trong video)<textarea id="postCaption" maxlength="300" rows="3"></textarea></label>
+          <button class="button primary" type="button" id="renderButton" disabled>Render Life Luxury</button>
+          <div class="luxury-progress" id="renderProgress" hidden><div class="luxury-progress-track"><span id="progressFill"></span></div><p id="progressText" role="status"></p></div>
+          <div class="luxury-result" id="renderResult" hidden><video id="resultVideo" controls playsinline preload="metadata"></video><div><a class="button primary" id="downloadLink" download>Tải MP4</a><button class="button ghost" id="copyCaption" type="button">Sao chép caption bài đăng</button></div></div>
+        </section>
+        <section class="luxury-history" aria-labelledby="historyTitle"><h2 id="historyTitle">Video Luxury đã tạo</h2><div id="luxuryHistory"><p>Đang tải thư viện…</p></div></section>
+        <p class="luxury-error" id="luxuryError" role="alert" hidden></p>
+      </div>
+      <aside class="luxury-preview" aria-label="Xem trước bố cục">
+        <div class="luxury-phone"><div class="luxury-phone-inner"><video id="scenePreviewVideo" muted controls playsinline preload="metadata"></video></div></div>
+        <p>Chọn một cảnh để xem footage. Khung hình xuất ra không có tiêu đề, caption hay số cảnh.</p>
+      </aside>
+    </div>
+  </main>
+  <script src="/luxury.js" defer></script>
+</body>
+</html>

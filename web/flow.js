@@ -322,5 +322,7 @@
 
   window.refreshFlow = refresh;
   if (document.querySelector('.app-shell')?.dataset.page === 'flow') void refresh();
-  setInterval(() => void refresh(), 6000);
+  setInterval(() => {
+    if (document.querySelector('.app-shell')?.dataset.page === 'flow') void refresh();
+  }, 6000);
 })();

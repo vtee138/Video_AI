@@ -6,13 +6,26 @@ import {isFootageShortage, nextPostAt, validateSuperFootageRepair, validateSuper
 test('Super Auto validates local publishing cadence and start window', () => {
   const now = new Date('2026-10-07T03:00:00.000Z');
   const plan = validateSuperPlan({template: 'quote', mode: 'caption', focus: '  kỷ luật  ',
-    intervalMinutes: 360, startAt: '2026-10-07T04:00:00.000Z'}, now);
+    intervalMinutes: 360, startAt: '2026-10-07T04:00:00.000Z', videoLimit: 2,
+    publishTimes: ['2026-10-07T04:00:00.000Z', '2026-10-07T13:00:00.000Z']}, now);
   assert.equal(plan.focus, 'kỷ luật');
   assert.equal(plan.intervalMinutes, 360);
+  assert.equal(plan.videoLimit, 2);
+  assert.equal(plan.publishTimes[1], '2026-10-07T13:00:00.000Z');
   assert.throws(() => validateSuperPlan({intervalMinutes: 0,
     startAt: '2026-10-07T04:00:00.000Z'}, now), /15 phút/);
   assert.throws(() => validateSuperPlan({intervalMinutes: 60,
     startAt: '2026-10-06T04:00:00.000Z'}, now), /Giờ đăng đầu tiên/);
+});
+
+test('Super Auto requires one ordered publishing time per video', () => {
+  const now = new Date('2026-10-07T03:00:00.000Z');
+  const base = {template: 'ranking', intervalMinutes: 60, startAt: '2026-10-07T04:00:00.000Z',
+    videoLimit: 2, publishTimes: ['2026-10-07T04:00:00.000Z', '2026-10-07T05:00:00.000Z']};
+  assert.throws(() => validateSuperPlan({...base, videoLimit: 31}, now), /1 đến 30/);
+  assert.throws(() => validateSuperPlan({...base, publishTimes: [base.startAt]}, now), /từng video/);
+  assert.throws(() => validateSuperPlan({...base,
+    publishTimes: [base.startAt, '2026-10-07T04:30:00.000Z']}, now), /ít nhất 60 phút/);
 });
 
 test('Super Auto never schedules sooner than the previous upload gap', () => {

@@ -233,7 +233,7 @@ Corners are compact and functional. Small tags and source marks use the tightest
 
 ### Navigation
 
-The primary rail names four durable destinations: Overview, Create, Automation, and Library. Create alone shows the five-step production sequence beneath the primary links. Each destination has a stable URL, while the creation steps have nested URLs. On narrow screens the primary links form a scrollable row above the compact step strip. Library provides search and publication-status filtering; video preview opens in a dialog when the preview rail is hidden.
+The primary rail starts with a Menu tổng that opens Ranking, Quote, and Flow. Ranking and Quote each have their own overview, creation sequence, automation, publishing, library, and music routes under their workspace URL. Flow exposes its separate try-on workflow. Only the active workspace's tools and sessions appear in its rail and content. Create shows the five-step production sequence beneath the primary links. On narrow screens the primary links form a scrollable row above the compact step strip. Library provides search and publication-status filtering; video preview opens in a dialog when the preview rail is hidden.
 
 Library results use a three-column grid on desktop, two columns on tablet, and one on phones. Each entry shows a cached frame from its vertical MP4, the title and publication status, a visible preview action, and a compact More menu for secondary actions.
 

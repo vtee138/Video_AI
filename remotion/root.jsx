@@ -2,6 +2,7 @@ import React from 'react';
 import {Composition} from 'remotion';
 import {RankingVideo} from './video.jsx';
 import {QuoteVideo} from './quote-video.jsx';
+import {LuxuryVideo} from './luxury-video.jsx';
 
 const sample = {type: 'ranking', title: 'TOP 10 NỀN KINH TẾ LỚN NHẤT', subtitle: 'GDP danh nghĩa · 2025 (ước tính)',
   entityType: 'country',
@@ -12,7 +13,9 @@ const sample = {type: 'ranking', title: 'TOP 10 NỀN KINH TẾ LỚN NHẤT', s
   backgroundClips: [], musicPath: null};
 const quoteSample = {type: 'quote', mode: 'caption', title: 'Giữ lời khi công việc khó',
   quoteText: '', hookText: 'Lúc công việc khó nhất mới biết một lời hứa có giá trị đến đâu.',
-  backgroundImage: null, musicPath: null, duration: 35};
+  backgroundImages: [], musicPath: null, duration: 35};
+const luxurySample = {type: 'luxury', title: 'Life of Luxury', duration: 30,
+  backgroundClips: [], musicPath: null, sfxPath: null};
 
 export const Root = () => <>
   <Composition id="RankingVideo" component={RankingVideo}
@@ -20,4 +23,6 @@ export const Root = () => <>
   <Composition id="QuoteVideo" component={QuoteVideo}
     width={1080} height={1920} fps={30} durationInFrames={1050} defaultProps={{spec: quoteSample}}
     calculateMetadata={({props}) => ({durationInFrames: Math.round((props.spec.duration || 35) * 30)})} />
+  <Composition id="LuxuryVideo" component={LuxuryVideo}
+    width={1080} height={1920} fps={30} durationInFrames={900} defaultProps={{spec: luxurySample}} />
 </>;

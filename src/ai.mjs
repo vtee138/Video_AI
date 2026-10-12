@@ -1,5 +1,6 @@
 import {requireEnv} from './common.mjs';
 import {hasFiveQuotePoints} from './quote.mjs';
+import {hasVerbatimKnowledgePassage, quoteKnowledgeInstructions} from './quote-knowledge.mjs';
 
 const object = (properties) => ({type: 'object', properties, required: Object.keys(properties), additionalProperties: false});
 const str = {type: 'string'};
@@ -35,13 +36,13 @@ export const aiConfig = () => {
       ? Boolean(process.env.OMNIROUTER_API_KEY && process.env.OMNIROUTER_GEMINI_BASE_URL)
       : Boolean(process.env.GEMINI_API_KEY),
     model: omnirouter
-      ? process.env.OMNIROUTER_MODEL || 'antigravity/gemini-3.7-flash-tiered'
+      ? process.env.OMNIROUTER_MODEL || 'antigravity/gemini-3.8-flash-tiered'
       : process.env.GEMINI_MODEL || 'gemini-3.8-flash',
     searchModel: omnirouter
-      ? process.env.OMNIROUTER_SEARCH_MODEL || process.env.OMNIROUTER_MODEL || 'antigravity/gemini-3.7-flash-tiered'
+      ? process.env.OMNIROUTER_SEARCH_MODEL || process.env.OMNIROUTER_MODEL || 'antigravity/gemini-3.8-flash-tiered'
       : process.env.GEMINI_SEARCH_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash',
     quoteModel: omnirouter
-      ? process.env.OMNIROUTER_QUOTE_MODEL || 'antigravity/gemini-3.7-flash-tiered'
+      ? process.env.OMNIROUTER_QUOTE_MODEL || 'antigravity/gemini-3.8-flash-tiered'
       : process.env.GEMINI_QUOTE_MODEL || 'gemini-3.1-flash-lite',
   };
 };
@@ -136,6 +137,30 @@ async function generateOmni(name, schema, input, web, model) {
     if (!response.ok) throw new Error(`OmniRouter ${name}: ${data.error?.message || `HTTP ${response.status}`}`);
     return data;
   };
+  let activeModel = model;
+  const chat = async body => {
+    try { return await post('/v1/chat/completions', {...body, model: activeModel}); }
+    catch (error) {
+      if (!/not available in the active live catalog/i.test(error.message)) throw error;
+      let fallback;
+      try {
+        const response = await fetch(`${baseUrl}/v1/models`, {headers});
+        if (response.ok) {
+          const catalog = await response.json();
+          fallback = (catalog.data || []).map(item => item.id).filter(id =>
+            /^antigravity\/gemini-\d+(?:\.\d+)?-flash(?:-tiered|-lite)?$/.test(id) && id !== activeModel)
+            .sort((a, b) => {
+              const version = id => { const match = /^antigravity\/gemini-(\d+)(?:\.(\d+))?/.exec(id); return Number(match[1]) * 100 + Number(match[2] || 0); };
+              return version(b) - version(a) || Number(b.endsWith('-tiered')) - Number(a.endsWith('-tiered'));
+            })[0];
+        }
+      } catch { /* Keep the original provider error when the catalog cannot be read. */ }
+      if (!fallback) throw error;
+      console.warn(`OmniRouter ${name}: ${activeModel} không còn trong live catalog; chuyển sang ${fallback}.`);
+      activeModel = fallback;
+      return post('/v1/chat/completions', {...body, model: activeModel});
+    }
+  };
   let evidence = [];
   let searches = 0;
   let fallbackSearches = 0;
@@ -143,7 +168,7 @@ async function generateOmni(name, schema, input, web, model) {
   let outputTokens = 0;
   if (web) {
     const querySchema = object({queries: boundedArray(str, 2, 4)});
-    const plan = await post('/v1/chat/completions', {model, stream: false,
+    const plan = await chat({stream: false,
       messages: [{role: 'user', content: `Viết 3 truy vấn web ngắn, khác nhau, ưu tiên nguồn dữ liệu chính thức để trả lời yêu cầu sau. Chỉ trả JSON.\n${input}`}],
       response_format: {type: 'json_schema', json_schema: {name: 'search_queries', strict: true, schema: querySchema}},
     });
@@ -175,8 +200,8 @@ async function generateOmni(name, schema, input, web, model) {
       }));
     if (!evidence.some(item => item.results.length)) throw new Error(`Không tìm được nguồn web qua OmniRoute, DuckDuckGo hoặc Bing cho ${name}.`);
   }
-  const data = await post('/v1/chat/completions', {
-    model, stream: false,
+  const data = await chat({
+    stream: false,
     messages: [{role: 'user', content: `${input}\n\n${web ? `Kết quả tìm kiếm web vừa thực hiện (chỉ dùng URL có trong đây làm nguồn): ${JSON.stringify(evidence)}\n\n` : ''}Trả lời bằng JSON hợp lệ, không có gì khác ngoài JSON.`}],
     ...(schema ? {response_format: {type: 'json_schema', json_schema: {name, strict: true, schema}}} : {}),
     ...(name.startsWith('quote_') ? {max_tokens: name === 'quote_ideas' ? 12000 : 4500} : {}),
@@ -185,7 +210,7 @@ async function generateOmni(name, schema, input, web, model) {
   outputTokens += data.usage?.completion_tokens || 0;
   const content = data.choices?.[0]?.message?.content;
   if (typeof content !== 'string' || !content) throw new Error(`OmniRouter không trả nội dung cho ${name}.`);
-  console.log(`OmniRouter ${name}: ${model}, ${inputTokens} input + ${outputTokens} output tokens, ${searches} web searches${fallbackSearches ? ` (${fallbackSearches} search fallback)` : ''}`);
+  console.log(`OmniRouter ${name}: ${activeModel}, ${inputTokens} input + ${outputTokens} output tokens, ${searches} web searches${fallbackSearches ? ` (${fallbackSearches} search fallback)` : ''}`);
   return parseJson(content);
 }
 
@@ -271,7 +296,7 @@ export async function discoverSuperTopic({template, focus = '', recent = []}) {
   return topic;
 }
 
-function quoteIdeaIssue(idea) {
+function quoteIdeaIssue(idea, sources = []) {
   if (!idea || typeof idea !== 'object') return 'thiếu nội dung';
   if (String(idea.quoteText || '').trim()) return 'quoteText phải để trống';
   const hook = String(idea.hookText || '').trim();
@@ -288,11 +313,14 @@ function quoteIdeaIssue(idea) {
   const captionLength = String(idea.captionText || '').trim().length;
   if (captionLength < 450 || captionLength > 1800) return `caption dài ${captionLength} ký tự, cần 450-1800`;
   if (!hasFiveQuotePoints(idea.captionText)) return 'caption cần đúng 5 ý đánh số từ 1 đến 5';
+  if (sources.some(source => hasVerbatimKnowledgePassage(source, [idea.title, idea.hookText, idea.captionText]))) {
+    return 'nội dung còn chép một đoạn dài từ ý gốc trong kho; cần diễn đạt lại';
+  }
   return null;
 }
 
-async function repairQuoteIdea(prompt, idea, index) {
-  let issue = quoteIdeaIssue(idea);
+async function repairQuoteIdea(prompt, idea, index, sources = []) {
+  let issue = quoteIdeaIssue(idea, sources);
   for (let attempt = 0; attempt < 2 && issue; attempt++) {
     const repaired = await generate('quote_idea_repair', quoteIdeaSchema,
       `Sửa MỘT nội dung Quote tiếng Việt cho chủ đề: ${prompt}. Đây là phương án số ${index + 1} trong nhóm 8 phương án, giữ nguyên góc nhìn riêng của nó. ` +
@@ -301,19 +329,29 @@ async function repairQuoteIdea(prompt, idea, index) {
       `captionText 550-1500 ký tự, gồm đúng 5 đoạn đánh số 1. đến 5., không có mở bài hoặc kết bài ngoài 5 đoạn. Mỗi ý mới, cụ thể, trực diện và có tình huống hoặc hệ quả; nội dung chính nằm ở caption. ` +
       `Giọng lạnh, sắc, thực dụng như người đứng đầu phải chốt việc và chịu hậu quả. Ưu tiên luật chơi, quyền quyết định, chọn người, cắt lỗ và lợi ích nếu hợp chủ đề. ` +
       `Mỗi mục mở bằng một câu ngắn có lực, câu sau chỉ ra ai trả giá khi quyết định bị trì hoãn hoặc nguyên tắc bị phá. Dùng lời nói thường ngày, tránh văn bản đào tạo quản lý. Tránh văn danh ngôn, chữa lành, lời khuyên hiền và đạo đức sách giáo khoa. Không chửi bới, kể trải nghiệm cá nhân, bịa tỷ lệ hay gợi ý phạt tiền/hạ lương nhân viên tùy tiện.`, false);
-    issue = quoteIdeaIssue(repaired);
+    issue = quoteIdeaIssue(repaired, sources);
     if (!issue) return repaired;
     idea = repaired;
   }
   throw new Error(`AI chưa sửa được nội dung Quote số ${index + 1}: ${issue}. Hãy thử tạo lại.`);
 }
 
-export async function brainstormQuotes(prompt, mode) {
+export async function brainstormQuotes(prompt, mode, knowledge = {}) {
   if (mode !== 'caption') throw new Error('Chế độ Quote không hợp lệ.');
+  const sources = knowledge.sources?.map(item => item.content) || (knowledge.source ? [knowledge.source] : []);
+  const sourceDirection = knowledge.sources?.length
+    ? `Hãy viết đúng 8 nội dung nguyên bản từ các ý được rút ngẫu nhiên trong kho. Các mảng đang chọn: ${knowledge.categories?.join(', ') || 'toàn bộ kho'}. `
+    : `Hãy viết đúng 8 nội dung nguyên bản từ chủ đề: ${prompt}. `;
+  const coverageDirection = knowledge.sources?.length
+    ? `Mỗi idea bám một ý gốc hoặc một tổ hợp gần nhau; phân bổ 8 idea qua các mảng đã chọn. Giữ cơ chế và lập luận của ý gốc, nhưng đổi câu chữ, nhịp kể và tình huống. Không tự gán chi tiết không có trong ý gốc. Không lặp cùng luận điểm hoặc cùng bối cảnh. `
+    : `Bám sát chủ đề người dùng nhập. Nếu chủ đề rộng, trải 8 idea qua nhiều góc khác nhau; nếu chủ đề hẹp, đào sâu 8 hành vi, tình huống hoặc hệ quả thực sự khác nhau. Không tự gán cho chủ đề những chi tiết không được nêu: ví dụ “trách người khác không giúp” không mặc nhiên là vay nợ, đầu tư thua lỗ hay lười biếng. Trong 8 idea không lặp cùng luận điểm “không ai có nghĩa vụ giúp bạn” hoặc cùng bối cảnh. `;
+  const editorialDirection = knowledge.sources?.length
+    ? `Định hướng biên tập: triết lý sắc, lạnh và thực dụng về hành động, lợi ích, trách nhiệm và cái giá của một quyết định. Chọn bối cảnh khớp với từng ý gốc: kinh doanh, chính trị, quản lý, tiền bạc, quan hệ hoặc đời sống. Không biến một ý chính trị hay đời sống thành lời khuyên quản lý doanh nghiệp. `
+    : `Định hướng biên tập: triết lý sắc, lạnh và thực dụng về quyền quyết định, lãnh đạo, chọn người, đặt luật, cắt lỗ, lợi ích, tiền bạc, trách nhiệm và cái giá của sự yếu tay. Viết cho người phải đứng đầu một đội, một cuộc làm ăn hoặc chính cuộc đời mình; dám chịu phần quyết định khó. `;
   const result = await generate('quote_ideas', quoteIdeasSchema,
-    `Bạn là biên tập viên video ngắn tiếng Việt. Hãy viết đúng 8 nội dung nguyên bản từ chủ đề: ${prompt}. ` +
-    `Định hướng biên tập: triết lý sắc, lạnh và thực dụng về quyền quyết định, lãnh đạo, chọn người, đặt luật, cắt lỗ, lợi ích, tiền bạc, trách nhiệm và cái giá của sự yếu tay. Viết cho người phải đứng đầu một đội, một cuộc làm ăn hoặc chính cuộc đời mình; dám chịu phần quyết định khó. ` +
-    `Bám sát chủ đề người dùng nhập. Nếu chủ đề rộng, trải 8 idea qua nhiều góc khác nhau; nếu chủ đề hẹp, đào sâu 8 hành vi, tình huống hoặc hệ quả thực sự khác nhau. Không tự gán cho chủ đề những chi tiết không được nêu: ví dụ “trách người khác không giúp” không mặc nhiên là vay nợ, đầu tư thua lỗ hay lười biếng. Trong 8 idea không lặp cùng luận điểm “không ai có nghĩa vụ giúp bạn” hoặc cùng bối cảnh. ` +
+    `Bạn là biên tập viên video ngắn tiếng Việt. ${sourceDirection}` +
+    editorialDirection +
+    coverageDirection +
     `Giọng của người có quyền chốt việc và chấp nhận mất lòng: tỉnh, gọn, sắc, đôi khi tàn nhẫn với ảo tưởng. Câu chữ phải có thế đối đầu, lợi ích, trách nhiệm hoặc hậu quả cụ thể. Nói thẳng một quy tắc khó nghe, rồi chứng minh bằng cơ chế đời thực; không giảng đạo, không dỗ dành. Lãnh đạo không phải hình ảnh oai phong chung chung mà là quyết định ai được quyền làm gì, ai chịu giá của sai lầm và khi nào phải dừng. ` +
     `Tránh giọng chữa lành, nhân văn sáo, văn sách giáo khoa, vỗ về, than thân, lụy tình và khẩu hiệu truyền động lực. Không viết lời khuyên hiền ai cũng gật đầu như “hãy giao tiếp rõ ràng”, “hãy tôn trọng mọi người”, “hãy tin vào bản thân” nếu không có luật chơi và cái giá cụ thể. Không lặp các mô-típ “cứ đi tiếp”, “buông bỏ”, “im lặng rồi rời đi”, “để kết quả lên tiếng”. ` +
     `Mỗi idea có hookText mục tiêu 95-140 ký tự để đọc trong khoảng 5 giây trên ảnh. CÂU ĐẦU PHẢI ĐẬP VÀO MẮT: mở ngay bằng “Đừng…”, “Không…”, một động từ mạnh như “Cắt…”, “Dẹp…”, “Loại…”, “Lắng nghe…”, hoặc “5 điều phải biết…”. Trong 8 hook, dùng đủ các kiểu mở này và đổi cấu trúc câu; không để cả nhóm thành một mẫu lặp. Chốt một sự thật khó nghe về tâm lý quyền lực: sợ mất lòng, nghiện lời thuận tai, tham quyền, trốn trách nhiệm, ham giữ thể diện, hoặc tự lừa mình; gắn nó với kẻ hưởng lợi và cái giá cụ thể. Viết ngắn, thẳng, hơi tàn nhẫn; bỏ cụm đệm như “thực chất là”, “có thể”, “một trong những”, “điều quan trọng là”. Nói cụ thể ai lọc thông tin, ai ký quyết định sai, ai hưởng lợi, ai mất tiền hoặc mất người giỏi. Không dùng ẩn dụ kịch tính như “con rối”, “cái bẫy”, “sân khấu”, “đống đổ nát”, “rút tiền từ túi”; không dùng lời mạnh để che một ý rỗng. Không mở bằng danh từ trừu tượng như “Thói quen”, “Sự”, “Việc”, “Một”; không viết khẩu hiệu rỗng, checklist hiền hay câu dạy đời. Ví dụ về nhịp, không chép lại: “Đừng nghe một phía rồi phán. Kẻ xu nịnh thắng từ lúc lời nịnh được coi là sự thật.” Không đặt câu hỏi; không dùng “Hãy”, “Nên”, “Cần”; không xưng hô “bạn”, “tôi”, “mình”, “chúng ta”, “anh”, “em” trong hookText. Hook chỉ ném cú đấm đầu, phần mổ xẻ nằm trong caption. Không tự bịa phần trăm, thống kê hoặc kết quả định lượng để gây sốc. ` +
@@ -325,15 +363,16 @@ export async function brainstormQuotes(prompt, mode) {
     `Không trích dẫn, không gắn tên tác giả hay người nổi tiếng, không bắt chước câu nói nổi tiếng. ` +
     `Mỗi idea phải có một góc nhìn riêng, câu chữ tự nhiên, sắc, cụ thể, không sáo rỗng và không dùng dấu ngoặc kép bao quanh toàn bộ nội dung. Tránh mở đầu giống nhau ở 8 idea; không dùng mồi câu kiểu “ít ai biết”, “sự thật là”, “xem đến cuối”. Không ép người xem bình luận hoặc chia sẻ. ` +
     `title dài tối đa 55 ký tự, nêu rõ ý chính bằng từ người xem thường tìm kiếm và dùng làm tên video; tránh tiêu đề kiểu “Tầm quan trọng của”, “Bài học về”, “Kỹ năng”. Hashtag gồm 3-5 từ liên quan trực tiếp đến nội dung, không có dấu #; không dùng fyp, viral, xuhuong hoặc tag chung chung. ` +
-    `Chỉ trả title, quoteText, hookText, captionText và hashtags cho từng idea. Không lập kế hoạch footage trong lượt này.`, false);
+    `Chỉ trả title, quoteText, hookText, captionText và hashtags cho từng idea. Không lập kế hoạch footage trong lượt này. ` +
+    quoteKnowledgeInstructions(knowledge), false);
   if (!Array.isArray(result.ideas) || result.ideas.length !== 8) {
     throw new Error(`AI chỉ tạo ${result.ideas?.length || 0}/8 nội dung Quote. Hãy thử lại.`);
   }
   for (const [index, idea] of result.ideas.entries()) {
-    const issue = quoteIdeaIssue(idea);
+    const issue = quoteIdeaIssue(idea, sources);
     if (!issue) continue;
     console.warn(`Đang sửa nội dung Quote số ${index + 1}: ${issue}.`);
-    result.ideas[index] = await repairQuoteIdea(prompt, idea, index);
+    result.ideas[index] = await repairQuoteIdea(prompt, idea, index, sources);
   }
   return result.ideas;
 }

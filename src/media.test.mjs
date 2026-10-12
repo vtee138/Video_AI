@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {quietQuoteEnding, quoteMusicTiming, selectWeightedMusic} from './media.mjs';
+import {listMusicTracks, quietQuoteEnding, quoteMusicTiming, selectWeightedMusic} from './media.mjs';
+
+test('Ranking và Quote có URL và thư mục nhạc riêng', async () => {
+  const [ranking, quote] = await Promise.all([listMusicTracks('ranking'), listMusicTracks('quote')]);
+  assert.ok(ranking.length > 0 && quote.length > 0);
+  assert.ok(ranking.every(track => track.url.startsWith('/music/ranking/')));
+  assert.ok(quote.every(track => track.url.startsWith('/music/quote/')));
+  assert.notEqual(ranking[0].url, quote.find(track => track.name === ranking[0].name)?.url);
+});
 
 test('weighted music selection follows relative weights and avoids the previous track', () => {
   const tracks = [{name: 'a.mp3', weight: 1}, {name: 'b.mp3', weight: 3},

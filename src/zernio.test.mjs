@@ -226,6 +226,54 @@ test('a separate YouTube Zernio key handles account lookup, upload, post and sta
   }
 });
 
+test('a third Zernio key adds another YouTube channel and uses its own key for publishing', async () => {
+  const file = path.join(import.meta.dirname, 'zernio-youtube-key2-test.mp4');
+  const names = ['ZERNIO_API_KEY', 'ZERNIO_YOUTUBE_API_KEY', 'ZERNIO_YOUTUBE_API_KEY2'];
+  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  const oldFetch = globalThis.fetch;
+  const keys = [`sk_${'a'.repeat(64)}`, `sk_${'b'.repeat(64)}`, `sk_${'c'.repeat(64)}`];
+  names.forEach((name, index) => { process.env[name] = keys[index]; });
+  await writeFile(file, Buffer.from('test-video'));
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const address = String(url);
+    calls.push({address, authorization: options.headers?.Authorization});
+    if (address.endsWith('/accounts')) {
+      const index = keys.findIndex(key => options.headers.Authorization === `Bearer ${key}`);
+      return Response.json({accounts: index < 0 ? [] : [{_id: `yt-${index}`, platform: 'youtube',
+        username: `Channel ${index}`, isActive: true}]});
+    }
+    if (address.endsWith('/media/presign')) return Response.json({
+      uploadUrl: 'https://bucket.r2.cloudflarestorage.com/temp/key2.mp4',
+      publicUrl: 'https://media.zernio.com/temp/key2.mp4'});
+    if (address.startsWith('https://bucket.r2.')) return new Response('', {status: 200});
+    if (address.endsWith('/posts')) return Response.json({post: {_id: 'key2-post',
+      platforms: [{platform: 'youtube', accountId: 'yt-2', status: 'processing'}]}}, {status: 201});
+    if (address.endsWith('/posts/key2-post')) return Response.json({post: {_id: 'key2-post',
+      platforms: [{platform: 'youtube', accountId: 'yt-2', status: 'published'}]}});
+    throw new Error(`Unexpected request: ${address}`);
+  };
+  try {
+    const accounts = await zernioAccounts('youtube');
+    assert.deepEqual(accounts.map(account => account.id), ['yt-0', 'yt-1', 'yt-2']);
+    assert.equal(accounts[2].credential, 'tertiary');
+    const posted = await postYouTube(file, {accountId: 'yt-2', title: 'New channel',
+      description: 'Short description', privacy: 'private'});
+    assert.equal(posted.id, 'key2-post');
+    assert.equal((await zernioPostStatus(posted.id, 'youtube', posted.accountId)).state, 'published');
+    const publicationCalls = calls.filter(call => call.address.endsWith('/media/presign') ||
+      call.address.endsWith('/posts') || call.address.endsWith('/posts/key2-post'));
+    assert.equal(publicationCalls.length, 3);
+    assert.ok(publicationCalls.every(call => call.authorization === `Bearer ${keys[2]}`));
+  } finally {
+    globalThis.fetch = oldFetch;
+    for (const name of names) {
+      if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name];
+    }
+    await unlink(file);
+  }
+});
+
 test('Facebook Pages from both Zernio keys appear and post through their owning key', async () => {
   const file = path.join(import.meta.dirname, 'zernio-second-facebook-test.mp4');
   const oldKey = process.env.ZERNIO_API_KEY;

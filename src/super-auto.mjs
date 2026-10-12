@@ -13,7 +13,26 @@ export function validateSuperPlan(input, now = new Date()) {
   }
   const focus = String(input.focus || '').trim();
   if (focus.length > 300) throw new Error('Định hướng chủ đề tối đa 300 ký tự.');
-  return {template, mode, intervalMinutes, startAt: start.toISOString(), focus};
+  const videoLimit = Number(input.videoLimit);
+  if (!Number.isInteger(videoLimit) || videoLimit < 1 || videoLimit > 30) {
+    throw new Error('Số video trong chiến dịch phải từ 1 đến 30.');
+  }
+  if (!Array.isArray(input.publishTimes) || input.publishTimes.length !== videoLimit) {
+    throw new Error('Hãy đặt giờ đăng riêng cho từng video.');
+  }
+  const publishTimes = input.publishTimes.map((value, index) => {
+    const date = new Date(value);
+    if (typeof value !== 'string' || !Number.isFinite(date.getTime()) ||
+        date.getTime() < now.getTime() - 60_000 || date.getTime() > now.getTime() + 90 * 86400_000) {
+      throw new Error(`Giờ đăng video ${index + 1} phải từ hiện tại đến 90 ngày tới.`);
+    }
+    if (index && date.getTime() - new Date(input.publishTimes[index - 1]).getTime() < intervalMinutes * 60_000) {
+      throw new Error(`Video ${index + 1} phải cách video trước ít nhất ${intervalMinutes} phút.`);
+    }
+    return date.toISOString();
+  });
+  if (publishTimes[0] !== start.toISOString()) throw new Error('Giờ video đầu tiên không khớp lịch đăng.');
+  return {template, mode, intervalMinutes, startAt: start.toISOString(), focus, videoLimit, publishTimes};
 }
 
 export function nextPostAt(scheduledAt, lastStartedAt, intervalMinutes) {

@@ -8,6 +8,7 @@ import {publicationStatus} from './publication.mjs';
 import {summarizeSession} from './session.mjs';
 import {validateSuperFootageRepair, validateSuperRetry} from './super-auto.mjs';
 import {mediaReference, r2Enabled, readVideoCatalog, writeVideoCatalog} from './storage.mjs';
+import {eligibleQuoteKnowledge, inferQuoteCategories, pickBalancedQuoteKnowledge} from './quote-knowledge.mjs';
 export {publicationStatus} from './publication.mjs';
 
 const {Pool} = pg;
@@ -27,6 +28,82 @@ function connectionString() {
 const pool = new Pool({connectionString: connectionString(), max: 5,
   connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000});
 pool.on('error', error => console.error('PostgreSQL:', error.message));
+
+const quoteKnowledgeRow = row => ({id: row.id, content: row.content, categories: row.categories,
+  eligible: eligibleQuoteKnowledge(row.content),
+  createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString()});
+
+export async function listQuoteKnowledge() {
+  const {rows} = await pool.query('SELECT id, content, categories, created_at, updated_at FROM quote_knowledge ORDER BY created_at DESC');
+  return rows.map(quoteKnowledgeRow);
+}
+
+export async function addQuoteKnowledge(contents, categories = []) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const added = [];
+    for (const content of contents) {
+      const tags = categories.length ? categories : inferQuoteCategories(content);
+      const {rows} = await client.query(`INSERT INTO quote_knowledge (id, content, categories)
+        VALUES (gen_random_uuid(), $1, $2::text[])
+        ON CONFLICT (content) DO NOTHING RETURNING id, content, categories, created_at, updated_at`, [content, tags]);
+      if (rows[0]) added.push(quoteKnowledgeRow(rows[0]));
+    }
+    await client.query('COMMIT');
+    return added;
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}
+
+export async function updateQuoteKnowledge(id, content, categories) {
+  try {
+    const {rows} = await pool.query(`UPDATE quote_knowledge SET content=$2, categories=$3::text[], updated_at=now()
+      WHERE id=$1 RETURNING id, content, categories, created_at, updated_at`, [id, content, categories]);
+    return rows[0] ? quoteKnowledgeRow(rows[0]) : null;
+  } catch (error) {
+    if (error.code === '23505') throw new Error('Ý này đã có trong kho triết lý.');
+    throw error;
+  }
+}
+
+export async function deleteQuoteKnowledge(id) {
+  const {rowCount} = await pool.query('DELETE FROM quote_knowledge WHERE id=$1', [id]);
+  return rowCount > 0;
+}
+
+export async function quoteKnowledgeById(id) {
+  const {rows} = await pool.query('SELECT id, content, categories, created_at, updated_at FROM quote_knowledge WHERE id=$1', [id]);
+  return rows[0] ? quoteKnowledgeRow(rows[0]) : null;
+}
+
+export async function pickQuoteKnowledge() {
+  return (await pickQuoteKnowledgeBatch([], 1))[0] || null;
+}
+
+export async function pickQuoteKnowledgeBatch(categories = [], limit = 8) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const {rows} = await client.query(`SELECT id, content, categories, created_at, updated_at
+      FROM quote_knowledge WHERE char_length(content) >= 60
+      AND (cardinality($1::text[]) = 0 OR categories && $1::text[])
+      ORDER BY last_used_at ASC NULLS FIRST, random() LIMIT 200 FOR UPDATE SKIP LOCKED`, [categories]);
+    const picked = pickBalancedQuoteKnowledge(rows.filter(row => eligibleQuoteKnowledge(row.content)), categories, limit);
+    if (picked.length) await client.query('UPDATE quote_knowledge SET last_used_at=now() WHERE id = ANY($1::uuid[])',
+      [picked.map(row => row.id)]);
+    await client.query('COMMIT');
+    return picked.map(quoteKnowledgeRow);
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}
+
+export async function sampleQuoteKnowledge(excludeId, limit = 6) {
+  const {rows} = await pool.query(`SELECT content FROM quote_knowledge WHERE id IS DISTINCT FROM $1::uuid
+    AND char_length(content) >= 60
+    ORDER BY random() LIMIT $2`, [excludeId || null, limit]);
+  return rows.map(row => row.content);
+}
 
 export async function migrateOnly() {
   await migrateDatabase(pool);
@@ -126,27 +203,41 @@ export async function updateFlowJob(id, patch) {
 
 const campaignFromRow = row => ({id: row.id, status: row.status, template: row.template, mode: row.mode,
   focus: row.focus, intervalMinutes: row.interval_minutes, nextAt: row.next_at.toISOString(),
+  videoLimit: row.video_limit,
   readyAfter: row.ready_after.toISOString(), lastStartedAt: row.last_started_at?.toISOString() || null,
   autoSettings: row.auto_settings, error: row.error, createdAt: row.created_at.toISOString(),
   updatedAt: row.updated_at.toISOString()});
 const itemFromRow = row => ({id: row.id, campaignId: row.campaign_id, topic: row.topic,
-  jobId: row.job_id, scheduledAt: row.scheduled_at.toISOString(), status: row.status,
+  jobId: row.job_id, slotIndex: row.slot_index, scheduledAt: row.scheduled_at.toISOString(), status: row.status,
   outputName: row.output_name, postId: row.post_id, targets: row.targets, error: row.error,
   recoveryPending: row.recovery_pending, retryRequested: row.retry_requested,
   postResults: row.post_results || null,
   createdAt: row.created_at.toISOString()});
 
 export async function createSuperCampaign(campaign) {
-  const {rows} = await pool.query(`INSERT INTO super_campaigns
-    (id,status,template,mode,focus,interval_minutes,next_at,auto_settings)
-    VALUES ($1,'active',$2,$3,$4,$5,$6,$7::jsonb) RETURNING *`,
-  [campaign.id, campaign.template, campaign.mode, campaign.focus, campaign.intervalMinutes,
-    campaign.startAt, JSON.stringify(campaign.autoSettings)]);
-  return campaignFromRow(rows[0]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const {rows} = await client.query(`INSERT INTO super_campaigns
+      (id,status,template,mode,focus,interval_minutes,next_at,auto_settings,video_limit)
+      VALUES ($1,'active',$2,$3,$4,$5,$6,$7::jsonb,$8) RETURNING *`,
+    [campaign.id, campaign.template, campaign.mode, campaign.focus, campaign.intervalMinutes,
+      campaign.startAt, JSON.stringify(campaign.autoSettings), campaign.videoLimit]);
+    for (const [index, scheduledAt] of campaign.publishTimes.entries()) {
+      await client.query(`INSERT INTO super_items (id,campaign_id,slot_index,scheduled_at,status)
+        VALUES ($1,$2,$3,$4,'waiting')`, [campaign.itemIds[index], campaign.id, index + 1, scheduledAt]);
+    }
+    await client.query('COMMIT');
+    return campaignFromRow(rows[0]);
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 export async function listSuperCampaigns(limit = 10) {
-  const {rows} = await pool.query('SELECT * FROM super_campaigns ORDER BY created_at DESC LIMIT $1', [limit]);
+  const {rows} = await pool.query(`SELECT * FROM super_campaigns
+    WHERE status IN ('active','attention') OR id IN
+      (SELECT id FROM super_campaigns ORDER BY created_at DESC LIMIT $1)
+    ORDER BY created_at DESC`, [limit]);
   if (!rows.length) return [];
   const {rows: countRows} = await pool.query(`SELECT campaign_id, status, count(*)::integer AS total
     FROM super_items WHERE campaign_id = ANY($1::text[]) GROUP BY campaign_id, status`,
@@ -160,11 +251,11 @@ export async function listSuperCampaigns(limit = 10) {
   for (const row of rows) {
     const {rows: items} = await pool.query(`SELECT i.*, p.results AS post_results FROM super_items i
       LEFT JOIN posts p ON p.id = i.post_id WHERE i.campaign_id = $1
-      ORDER BY i.created_at DESC LIMIT 50`, [row.id]);
+      ORDER BY i.scheduled_at ASC LIMIT 50`, [row.id]);
     const byStatus = countsByCampaign.get(row.id) || {};
     campaigns.push({...campaignFromRow(row), counts: {
       total: Object.values(byStatus).reduce((sum, value) => sum + value, 0),
-      sent: byStatus.sent || 0, scheduled: byStatus.scheduled || 0,
+      sent: byStatus.sent || 0, waiting: byStatus.waiting || 0, scheduled: byStatus.scheduled || 0,
       producing: (byStatus.planning || 0) + (byStatus.producing || 0),
       manualReview: byStatus.manual_review || 0,
       publishing: byStatus.publishing || 0, failed: byStatus.failed || 0,
@@ -226,7 +317,8 @@ export async function claimNextSuperRetry(campaignId) {
     if (!rows.length) { await client.query('COMMIT'); return null; }
     const {rows: claimed} = await client.query(`UPDATE super_items i SET status = 'producing',
       retry_requested = false, recovery_pending = false, error = NULL,
-      scheduled_at = GREATEST(now(), c.next_at,
+      scheduled_at = GREATEST(now(),
+        CASE WHEN c.video_limit IS NULL THEN c.next_at ELSE i.scheduled_at END,
         COALESCE(c.last_started_at + make_interval(mins => c.interval_minutes), now())),
       updated_at = now() FROM super_campaigns c
       WHERE i.id = $1 AND c.id = i.campaign_id RETURNING i.*`, [rows[0].id]);
@@ -240,8 +332,33 @@ export async function claimNextSuperRetry(campaignId) {
 
 export async function openSuperItem(campaign) {
   const {rows: current} = await pool.query(`SELECT id FROM super_items WHERE campaign_id = $1
-    AND status IN ('planning','producing','manual_review','scheduled','publishing') LIMIT 1`, [campaign.id]);
+    AND status = ANY($2::text[]) LIMIT 1`, [campaign.id, campaign.videoLimit
+      ? ['planning', 'producing'] : ['planning', 'producing', 'manual_review', 'scheduled', 'publishing']]);
   return current.length > 0;
+}
+
+export async function claimNextSuperSlot(campaignId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const {rows} = await client.query(`SELECT i.* FROM super_items i
+      JOIN super_campaigns c ON c.id = i.campaign_id
+      WHERE i.campaign_id = $1 AND i.status = 'waiting' AND c.status = 'active'
+      ORDER BY i.slot_index LIMIT 1 FOR UPDATE OF i SKIP LOCKED`, [campaignId]);
+    if (!rows.length) { await client.query('COMMIT'); return null; }
+    await client.query("UPDATE super_items SET status = 'planning', updated_at = now() WHERE id = $1", [rows[0].id]);
+    await client.query('COMMIT');
+    return itemFromRow({...rows[0], status: 'planning'});
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
+}
+
+export async function completeSuperCampaign(campaignId) {
+  await pool.query(`UPDATE super_campaigns c SET status = 'completed', updated_at = now()
+    WHERE c.id = $1 AND c.video_limit IS NOT NULL AND c.status = 'active'
+      AND NOT EXISTS (SELECT 1 FROM super_items i WHERE i.campaign_id = c.id
+        AND i.status IN ('waiting','planning','producing','manual_review','scheduled','publishing','needs_review'))`,
+  [campaignId]);
 }
 
 export async function recentSuperTopics(campaignId) {
@@ -308,13 +425,15 @@ export async function claimSuperItemRetry(campaignId, itemId) {
       WHERE campaign_id = $1 AND status = 'needs_review' LIMIT 1`, [campaignId]);
     const {rows: openRows} = await client.query(`SELECT id FROM super_items
       WHERE campaign_id = $1 AND id <> $2
-      AND status IN ('planning','producing','manual_review','scheduled','publishing') LIMIT 1`, [campaignId, itemId]);
+      AND status = ANY($3::text[]) LIMIT 1`, [campaignId, itemId, campaign.video_limit
+        ? ['planning', 'producing'] : ['planning', 'producing', 'manual_review', 'scheduled', 'publishing']]);
     validateSuperRetry({campaignStatus: campaign.status, itemStatus: item.status,
       postId: item.post_id, hasPostHistory, hasNeedsReview: reviewRows.length > 0,
       hasOpenItem: openRows.length > 0});
     const {rows: retriedRows} = await client.query(`UPDATE super_items i SET
       status = 'producing', error = NULL, recovery_pending = false, retry_requested = false,
-      scheduled_at = GREATEST(now(), c.next_at,
+      scheduled_at = GREATEST(now(),
+        CASE WHEN c.video_limit IS NULL THEN c.next_at ELSE i.scheduled_at END,
         COALESCE(c.last_started_at + make_interval(mins => c.interval_minutes), now())),
       updated_at = now()
       FROM super_campaigns c WHERE i.id = $1 AND c.id = i.campaign_id RETURNING i.*`, [itemId]);
@@ -406,7 +525,7 @@ export async function stopSuperCampaign(id) {
     WHERE id = $1 AND status IN ('active','attention')`, [id]);
   if (!rowCount) throw new Error('Chiến dịch không còn hoạt động.');
   await pool.query(`UPDATE super_items SET status = 'canceled', updated_at = now()
-    WHERE campaign_id = $1 AND status = 'scheduled'`, [id]);
+    WHERE campaign_id = $1 AND status IN ('waiting','scheduled')`, [id]);
 }
 
 export async function resumeSuperCampaign(id) {
@@ -513,6 +632,13 @@ export async function activePostForOutput(outputName, platforms) {
     WHERE output_name = $1 ORDER BY created_at DESC`, [outputName]);
   return rows.find(row => platforms.some(platform =>
     ['queued', 'uploading', 'processing', 'verifying', 'published'].includes(row.results?.[platform]?.state))) || null;
+}
+
+export async function interruptedPlatformsForOutput(outputName, platforms) {
+  const {rows} = await pool.query(`SELECT results FROM posts
+    WHERE output_name = $1 ORDER BY created_at DESC`, [outputName]);
+  return platforms.filter(platform =>
+    rows.find(row => row.results?.[platform])?.results?.[platform]?.state === 'interrupted');
 }
 
 export async function listVideos(limit = null) {

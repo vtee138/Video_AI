@@ -20,6 +20,8 @@ Mở `http://127.0.0.1:4173`. Migration chạy tự động trước khi server 
 
 Compose gắn `output/`, `.tmp/`, `.cache/`, `public/` và `assets/` vào host để giữ cả media đã tải lên. PostgreSQL ở volume `ai-video-studio_video_studio_pgdata`.
 
+Kho seed trong `seed/media/` hiện có 9 ảnh Quote và 5 bài nhạc Luxury của phiên bản này. Lần đầu app khởi động hoặc chạy `npm run db:seed`, file thiếu được chép vào `public/`; file đã có trên máy chủ không bị ghi đè. Marker `public/.bundled-media-seed-v1` ngăn seed lại những file đã bị xóa sau đó. Nhạc Ranking và Quote mặc định tiếp tục được nhập từ các MP3 ở `public/`. Các nội dung Quote được chèn bởi migration `005` và `006`. Bản ghi được thêm qua giao diện sau đó cần chuyển bằng backup/restore PostgreSQL ở phần dưới.
+
 ## Chuyển dữ liệu PostgreSQL từ máy cũ
 
 Trên máy cũ, dừng app để không có job đang ghi, rồi tạo bản sao lưu:

@@ -15,12 +15,14 @@ function primaryApiKey() {
 export function zernioApiKey(platform) {
   const primary = primaryApiKey();
   const secondary = process.env.ZERNIO_YOUTUBE_API_KEY || '';
-  return platform === 'youtube' ? secondary || primary : primary || secondary;
+  const tertiary = process.env.ZERNIO_YOUTUBE_API_KEY2 || '';
+  return platform === 'youtube' ? secondary || tertiary || primary : primary || secondary || tertiary;
 }
 
 function keyForCredential(credential, platform) {
   if (credential === 'primary') return primaryApiKey();
   if (credential === 'secondary') return process.env.ZERNIO_YOUTUBE_API_KEY || '';
+  if (credential === 'tertiary') return process.env.ZERNIO_YOUTUBE_API_KEY2 || '';
   return zernioApiKey(platform);
 }
 
@@ -52,7 +54,9 @@ function accountList(data, credential) {
 export async function zernioAccounts(platform) {
   const primary = primaryApiKey();
   const secondary = process.env.ZERNIO_YOUTUBE_API_KEY || '';
-  const credentials = [primary && 'primary', secondary && secondary !== primary && 'secondary'].filter(Boolean);
+  const tertiary = process.env.ZERNIO_YOUTUBE_API_KEY2 || '';
+  const credentials = [primary && 'primary', secondary && secondary !== primary && 'secondary',
+    tertiary && tertiary !== primary && tertiary !== secondary && 'tertiary'].filter(Boolean);
   if (!credentials.length) return [];
   const results = await Promise.allSettled(credentials.map(credential => request('/accounts', {credential})));
   if (results.every(result => result.status === 'rejected')) throw results[0].reason;
@@ -63,7 +67,8 @@ export async function zernioAccounts(platform) {
       const key = `${account.platform}:${account.id}`;
       const existing = accounts.get(key);
       if (!existing || !existing.active && account.active ||
-          existing.active === account.active && account.platform === 'youtube' && account.credential === 'secondary') {
+          existing.active === account.active && account.platform === 'youtube' &&
+            account.credential !== 'primary' && existing.credential === 'primary') {
         accounts.set(key, account);
       }
     }

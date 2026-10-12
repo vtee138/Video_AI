@@ -8,13 +8,17 @@ import {listQuoteImages} from './quote-images.mjs';
 
 const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || undefined;
 
-const music = (await listMusic())[0] || null;
-let quoteImage = (await listQuoteImages())[0]?.url.slice(1);
-if (!quoteImage) {
-  quoteImage = 'runs/smoke/quote-image.png';
+const rankingMusic = (await listMusic('ranking'))[0];
+const quoteMusic = (await listMusic('quote'))[0];
+const music = rankingMusic ? `ranking-music/${rankingMusic}` : null;
+const quoteMusicPath = quoteMusic ? `quote-music/${quoteMusic}` : null;
+let quoteImages = (await listQuoteImages()).slice(0, 2).map(image => image.url.slice(1));
+if (quoteImages.length < 2) {
+  const fallback = 'runs/smoke/quote-image.png';
   await mkdir(path.join(publicDir, 'runs', 'smoke'), {recursive: true});
-  await writeFile(path.join(publicDir, quoteImage), Buffer.from(
+  await writeFile(path.join(publicDir, fallback), Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==', 'base64'));
+  quoteImages = [...quoteImages, fallback].slice(0, 2);
 }
 async function sampleClips() {
   const runsDir = path.join(publicDir, 'runs');
@@ -60,10 +64,10 @@ console.log(mp4);
 const quoteSpecs = [
   {type: 'quote', mode: 'onscreen', title: 'Quote trên video', duration: 35,
     quoteText: 'Có những ngày bạn không cần chứng minh điều gì. Chỉ cần âm thầm tiến về phía trước, để kết quả lên tiếng thay mình.',
-    hookText: '', backgroundImage: quoteImage, musicPath: music},
+    hookText: '', backgroundImages: quoteImages, musicPath: quoteMusicPath},
   {type: 'quote', mode: 'caption', title: 'Quote ở caption', duration: 35,
     quoteText: '', hookText: 'Lúc công việc khó nhất mới biết một lời hứa có giá trị đến đâu.',
-    backgroundImage: quoteImage, musicPath: music},
+    backgroundImages: quoteImages, musicPath: quoteMusicPath},
 ];
 for (const [index, quoteSpec] of quoteSpecs.entries()) {
   const quoteComposition = await selectComposition({serveUrl, id: 'QuoteVideo', inputProps: {spec: quoteSpec}, browserExecutable});

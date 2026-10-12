@@ -15,16 +15,19 @@ import {outputDir, publicDir, root, saveJson} from './common.mjs';
 import {renderVideo} from './render.mjs';
 import {makeCancelSignal} from '@remotion/renderer';
 import {quoteCaption, quoteDuration} from './quote.mjs';
-import {copyQuoteImage, deleteQuoteImage, listQuoteImages, pickQuoteImage, uploadQuoteImage} from './quote-images.mjs';
+import {copyQuoteImage, deleteQuoteImage, listQuoteImages, pickQuoteImages, uploadQuoteImage} from './quote-images.mjs';
+import {normalizeKnowledgeContent, parseKnowledgeBatch, parseQuoteCategories, quoteCategories} from './quote-knowledge.mjs';
 import {facebookStatus, platformNames, publishConfig, publishers, tiktokCreator, tiktokStatus, youtubeStatus,
   zernioPostStatus} from './publish.mjs';
 import {zernioAccounts, zernioApiKey, zernioConnectUrl, zernioFindPost} from './zernio.mjs';
 import {rankingCaption, withoutSourceAppendix} from './caption.mjs';
 import {autoPostTargets, selectAutoFootage, validateAutoSettings} from './auto.mjs';
-import {activePostForOutput, activeSuperCampaigns, claimDueSuperItem, claimNextSuperRetry, claimSuperItemFootageRepair, claimSuperItemRetry, createSuperCampaign, createSuperItem,
+import {activePostForOutput, activeSuperCampaigns, claimDueSuperItem, claimNextSuperRetry, claimNextSuperSlot, claimSuperItemFootageRepair, claimSuperItemRetry, completeSuperCampaign, createSuperCampaign, createSuperItem,
+  addQuoteKnowledge, deleteQuoteKnowledge, listQuoteKnowledge, pickQuoteKnowledge, pickQuoteKnowledgeBatch,
+  quoteKnowledgeById, sampleQuoteKnowledge, updateQuoteKnowledge,
   deleteSessionRecord, deleteVideoRecord,
   failSuperItem, finishSuperItem, flagSuperAttention, initDatabase, listJobs, listSessions, listSuperCampaigns, listVideos, loadPost,
-  interruptedSuperRetries, loadSessionForRetry, queueFailedSuperRetries, videoForRun,
+  interruptedPlatformsForOutput, interruptedSuperRetries, loadSessionForRetry, queueFailedSuperRetries, videoForRun,
   markPublication, openSuperItem, publicationStatus, recentSuperTopics, resumeSuperCampaign,
   saveJob, savePost, saveVideo, scheduleSuperItem, seedExistingOutputs, stopSuperCampaign, superItemsForJobs,
   updateSuperItem} from './db.mjs';
@@ -33,8 +36,10 @@ import {concurrencyConfig, Semaphore} from './concurrency.mjs';
 import {nextRunnableJobIndex, queueStatus} from './queue-control.mjs';
 import {sameUiOrigin} from './request-origin.mjs';
 import {handleFlowRequest} from './flow-tryon.mjs';
+import {handleLuxuryRequest} from './luxury.mjs';
 import {watchFlowDownloads} from './flow-download-watch.mjs';
 import {deleteRemoteMedia, ensureLocalMedia, remoteMedia} from './storage.mjs';
+import {seedBundledMedia} from './seed-media.mjs';
 
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 4173);
@@ -52,8 +57,11 @@ const concurrency = concurrencyConfig();
 const renderSlots = new Semaphore(concurrency.renders);
 const downloadSlots = new Semaphore(concurrency.downloads);
 const publishSlots = new Semaphore(concurrency.publishes);
+const superPlanSlots = new Semaphore(concurrency.jobs);
 let queueWorkerActive = false;
 let superWorkerActive = false;
+let superPublishWorkerActive = false;
+const superPublishTasks = new Set();
 let superLastStatusRefresh = 0;
 const staticFiles = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
@@ -62,6 +70,11 @@ const staticFiles = new Map([
   ['/create/queue', ['index.html', 'text/html; charset=utf-8']],
   ['/create/footage', ['index.html', 'text/html; charset=utf-8']],
   ['/create/results', ['index.html', 'text/html; charset=utf-8']],
+  ['/ranking', ['index.html', 'text/html; charset=utf-8']],
+  ['/quote', ['index.html', 'text/html; charset=utf-8']],
+  ['/luxury', ['luxury.html', 'text/html; charset=utf-8']],
+  ['/luxury.js', ['luxury.js', 'text/javascript; charset=utf-8']],
+  ['/luxury.css', ['luxury.css', 'text/css; charset=utf-8']],
   ['/automation', ['index.html', 'text/html; charset=utf-8']],
   ['/flow', ['index.html', 'text/html; charset=utf-8']],
   ['/publishing', ['index.html', 'text/html; charset=utf-8']],
@@ -72,6 +85,12 @@ const staticFiles = new Map([
   ['/flow.css', ['flow.css', 'text/css; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
 ]);
+for (const kind of ['ranking', 'quote']) {
+  for (const section of ['create', 'create/ideas', 'create/queue', 'create/footage',
+    'create/results', 'automation', 'publishing', 'library', 'music']) {
+    staticFiles.set(`/${kind}/${section}`, ['index.html', 'text/html; charset=utf-8']);
+  }
+}
 
 const json = (res, status, data) => {
   res.writeHead(status, {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
@@ -90,7 +109,11 @@ async function body(req) {
   catch { throw new Error('Nội dung gửi lên không hợp lệ.'); }
 }
 
-const runId = () => new Date().toISOString().replace(/[:.]/g, '-');
+let lastRunTimestamp = 0;
+const runId = () => {
+  lastRunTimestamp = Math.max(Date.now(), lastRunTimestamp + 1);
+  return new Date(lastRunTimestamp).toISOString().replace(/[:.]/g, '-');
+};
 const postId = () => `${runId()}-${Math.random().toString(36).slice(2, 8)}`;
 const runDir = (id) => path.join(root, '.tmp', id);
 
@@ -235,7 +258,7 @@ const publicQueueItem = (run) => ({
     candidates: run.template === 'quote' ? (run.candidates || []) : (run.candidates || []).map(candidate => publicCandidate(candidate, run.id)),
     warnings: run.footageWarnings || [],
     preselectedIds: run.preselectedIds || [],
-    requiredClips: run.requiredClips || (run.template === 'quote' ? 1 : 8),
+    requiredClips: run.template === 'quote' ? 1 : (run.requiredClips || 8),
   } : null,
 });
 
@@ -245,8 +268,11 @@ function getRun(id) {
   return run;
 }
 
-async function createIdeas(prompt, template = 'ranking', mode = null) {
+async function createIdeas(prompt, template = 'ranking', mode = null, knowledge = {}) {
   if (template === 'quote') mode = 'caption';
+  if (template === 'quote' && !knowledge.examples && !knowledge.sources?.length) {
+    knowledge = {...knowledge, examples: await sampleQuoteKnowledge(null)};
+  }
   const id = runId();
   const folder = runDir(id);
   await mkdir(folder, {recursive: true});
@@ -256,7 +282,7 @@ async function createIdeas(prompt, template = 'ranking', mode = null) {
   await saveJob(run);
   try {
     run.ideas = template === 'quote'
-      ? await brainstormQuotes(prompt, mode)
+      ? await brainstormQuotes(prompt, mode, knowledge)
       : await brainstorm(prompt);
     await saveJson(path.join(folder, 'ideas.json'), run.ideas);
     run.status = 'ideas';
@@ -279,8 +305,8 @@ async function prepareQuoteRun(run) {
   run.error = null;
   await saveJob(run);
   try {
-    const music = await chooseMusic();
-    const timing = music ? await quoteMusicTiming(music.path) : null;
+    const music = await chooseMusic('quote');
+    const timing = music ? await quoteMusicTiming(music.original) : null;
     run.duration = quoteDuration(timing?.seconds, timing?.quietEnding);
     run.requiredClips = 1;
     run.story = {...run.idea, musicPath: music?.path || null};
@@ -291,10 +317,10 @@ async function prepareQuoteRun(run) {
     });
     await writeFile(path.join(run.folder, 'caption.txt'), run.caption, 'utf8');
     run.candidates = await listQuoteImages();
-    run.preselectedIds = [pickQuoteImage(run.candidates)?.id].filter(Boolean);
+    run.preselectedIds = pickQuoteImages(run.candidates).map(image => image.id);
     run.footageWarnings = [];
     run.status = 'footage_review';
-    run.step = run.preselectedIds.length ? 'Đã chọn ngẫu nhiên 1 ảnh · chờ duyệt' : 'Kho ảnh trống · hãy upload ảnh Quote';
+    run.step = run.preselectedIds.length ? `Đã chọn ngẫu nhiên ${run.preselectedIds.length} ảnh · chờ duyệt` : 'Kho ảnh trống · hãy upload ảnh Quote';
     run.progress = 0.64;
   } catch (error) {
     run.status = 'error';
@@ -382,15 +408,15 @@ async function renderRun(run) {
     let spec = run.retrySpec;
     if (!spec) {
     if (run.template === 'quote') {
-      const image = run.selectedCandidates?.[0];
-      if (!image) throw new Error('Hãy chọn một ảnh Quote.');
-      const backgroundImage = await copyQuoteImage(image.id, run.id);
+      const images = run.selectedCandidates;
+      if (!images?.length) throw new Error('Hãy chọn ít nhất một ảnh Quote.');
+      const backgroundImages = await Promise.all(images.map((image, index) => copyQuoteImage(image.id, run.id, index + 1)));
       spec = {type: 'quote', width: 1080, height: 1920, fps: 30, duration: run.duration,
         mode: run.mode, title: story.title, quoteText: story.quoteText, hookText: story.hookText,
-        backgroundImage, musicPath: story.musicPath || null};
-      await saveJson(path.join(run.folder, 'media-sources.json'), [{id: image.id, path: backgroundImage}]);
+        backgroundImages, musicPath: story.musicPath || null};
+      await saveJson(path.join(run.folder, 'media-sources.json'), images.map((image, index) => ({id: image.id, path: backgroundImages[index]})));
     } else {
-      const music = await chooseMusic();
+      const music = await chooseMusic('ranking');
       const clips = await downloadSlots.use(() => downloadFootage(run.selectedCandidates, run.id));
       const detectedCountries = run.facts.top10.filter(item => item.countryCode).length;
       spec = {
@@ -520,7 +546,7 @@ async function processQueuedJob(job) {
       if (job.template === 'quote') {
         job.requiredClips = 1;
         job.candidates = await listQuoteImages();
-        job.preselectedIds = [pickQuoteImage(job.candidates)?.id].filter(Boolean);
+        job.preselectedIds = pickQuoteImages(job.candidates).map(image => image.id);
         job.footageWarnings = [];
       } else {
         const search = await findFootage(job.story.backgroundQueries);
@@ -539,13 +565,13 @@ async function processQueuedJob(job) {
       if (job.status === 'review') await prepareRun(job);
     }
     if (job.autoSettings && job.status === 'footage_review') {
-      const minimum = job.template === 'quote' ? job.requiredClips : 8;
+      const minimum = job.template === 'quote' ? 2 : 8;
       const selected = job.template === 'quote'
-        ? [job.candidates.find(candidate => candidate.id === job.preselectedIds?.[0])].filter(Boolean)
+        ? (job.preselectedIds || []).map(id => job.candidates.find(candidate => candidate.id === id)).filter(Boolean)
         : selectAutoFootage(job.candidates || [], job.template, job.requiredClips);
       if (selected.length < minimum) {
         job.status = 'error';
-        job.error = job.template === 'quote' ? 'Kho ảnh Quote đang trống. Hãy upload ảnh rồi chạy lại.'
+        job.error = job.template === 'quote' ? 'Kho ảnh Quote cần ít nhất 2 ảnh khác nhau. Hãy upload thêm ảnh rồi chạy lại.'
           : `Chỉ tìm được ${selected.length}/${minimum} clip phù hợp. ` +
             `${job.footageSummary ? `Nguồn: ${job.footageSummary}. ` : ''}Hãy chạy thủ công để bổ sung footage.`;
         job.step = job.template === 'quote' ? 'Kho ảnh Quote đang trống' : 'Không đủ footage để chạy tự động';
@@ -564,6 +590,7 @@ async function processQueuedJob(job) {
     activeJobs.delete(job.id);
     await saveJob(job);
     if (job.superItemId && job.status === 'error') await failSuperItem(job.superItemId, job.error || 'Không thể tạo video.');
+    if (job.superItemId) void tickSuperAuto();
     if (parent) {
       refreshParent(parent);
       await saveJob(parent);
@@ -646,17 +673,19 @@ async function createQueue(parent, selections, autoInput = null, schedule = null
   return queueSnapshot(parent);
 }
 
-async function startSuperCycle(campaign) {
-  const scheduledAt = nextPostAt(campaign.nextAt, campaign.lastStartedAt, campaign.intervalMinutes);
-  const item = await createSuperItem(randomUUID(), campaign.id, scheduledAt);
+async function startSuperCycle(campaign, slot = null) {
+  const scheduledAt = slot?.scheduledAt || nextPostAt(campaign.nextAt, campaign.lastStartedAt, campaign.intervalMinutes);
+  const item = slot || await createSuperItem(randomUUID(), campaign.id, scheduledAt);
   try {
     const recent = await recentSuperTopics(campaign.id);
-    const topic = await discoverSuperTopic({template: campaign.template, focus: campaign.focus, recent});
+    const knowledgeSource = campaign.template === 'quote' && !campaign.focus ? await pickQuoteKnowledge() : null;
+    const topic = knowledgeSource?.content || await discoverSuperTopic({template: campaign.template, focus: campaign.focus, recent});
     if (!(await activeSuperCampaigns()).some(active => active.id === campaign.id)) {
       await updateSuperItem(item.id, {status: 'canceled', topic}); return;
     }
     await updateSuperItem(item.id, {topic, status: 'producing'});
-    const parent = await createIdeas(topic, campaign.template, campaign.mode);
+    const parent = await createIdeas(topic, campaign.template, campaign.mode,
+      {source: knowledgeSource?.content || null});
     if (!(await activeSuperCampaigns()).some(active => active.id === campaign.id)) {
       await updateSuperItem(item.id, {status: 'canceled'}); return;
     }
@@ -680,12 +709,15 @@ async function retrySuperItem(campaign, item) {
     }
     await updateSuperItem(item.id, {outputName: null, targets: null, postId: null});
     let topic = item.topic;
+    let knowledgeSource = campaign.template === 'quote' && !campaign.focus ? topic : null;
     if (!topic) {
       const recent = await recentSuperTopics(campaign.id);
-      topic = await discoverSuperTopic({template: campaign.template, focus: campaign.focus, recent});
+      const picked = campaign.template === 'quote' && !campaign.focus ? await pickQuoteKnowledge() : null;
+      topic = picked?.content || await discoverSuperTopic({template: campaign.template, focus: campaign.focus, recent});
+      knowledgeSource = picked?.content || null;
       await updateSuperItem(item.id, {topic});
     }
-    const parent = await createIdeas(topic, campaign.template, campaign.mode);
+    const parent = await createIdeas(topic, campaign.template, campaign.mode, {source: knowledgeSource});
     if (!(await activeSuperCampaigns()).some(active => active.id === campaign.id)) {
       await updateSuperItem(item.id, {status: 'canceled'});
       return;
@@ -727,6 +759,7 @@ async function publishDueSuperItem(item) {
     await publishPost(post, file, item.targets);
     const failed = Object.values(post.results).every(result => result.state === 'failed');
     await finishSuperItem(item.id, post.id, failed);
+    void tickSuperAuto();
   } catch (error) {
     const message = `Không thể xác nhận lượt đăng: ${error.message}`;
     if (postSaved) await flagSuperAttention(item.id, `${message}. Kiểm tra nền tảng trước khi tiếp tục.`);
@@ -734,19 +767,45 @@ async function publishDueSuperItem(item) {
   }
 }
 
+async function publishScheduledSuperItems() {
+  if (superPublishWorkerActive) return;
+  superPublishWorkerActive = true;
+  try {
+    while (superPublishTasks.size < concurrency.publishes) {
+      const due = await claimDueSuperItem();
+      if (!due) break;
+      const task = publishDueSuperItem(due)
+        .catch(error => console.error(`Đăng Super Auto ${due.id}:`, error.message))
+        .finally(() => { superPublishTasks.delete(task); void tickSuperAuto(); });
+      superPublishTasks.add(task);
+    }
+  } catch (error) { console.error('Đăng Super Auto:', error.message); }
+  finally { superPublishWorkerActive = false; }
+}
+
+async function prepareSuperCampaign(campaign) {
+  if ((new Date(campaign.readyAfter).getTime() > Date.now() && !campaign.videoLimit) ||
+      await openSuperItem(campaign)) return;
+  const retry = await claimNextSuperRetry(campaign.id);
+  if (retry) { await retrySuperItem(campaign, retry); return; }
+  if (campaign.videoLimit) {
+    const slot = await claimNextSuperSlot(campaign.id);
+    if (slot) await startSuperCycle(campaign, slot);
+    else await completeSuperCampaign(campaign.id);
+  } else await startSuperCycle(campaign);
+}
+
 async function tickSuperAuto() {
+  void publishScheduledSuperItems();
   if (superWorkerActive) return;
   superWorkerActive = true;
   try {
-    let due;
-    while ((due = await claimDueSuperItem())) await publishDueSuperItem(due);
     const campaigns = await activeSuperCampaigns();
-    for (const campaign of campaigns) {
-      if (new Date(campaign.readyAfter).getTime() > Date.now() || await openSuperItem(campaign)) continue;
-      const retry = await claimNextSuperRetry(campaign.id);
-      if (retry) { await retrySuperItem(campaign, retry); continue; }
-      await startSuperCycle(campaign);
-    }
+    const results = await Promise.allSettled(campaigns.map(campaign =>
+      superPlanSlots.use(() => prepareSuperCampaign(campaign))));
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') console.error(`Super Auto ${campaigns[index].id}:`, result.reason);
+    });
     if (Date.now() - superLastStatusRefresh > 60_000) {
       superLastStatusRefresh = Date.now();
       const recent = await listSuperCampaigns(3);
@@ -870,7 +929,7 @@ async function recoverRun(id, superRecovery = null) {
   run.candidates = search.candidates;
   run.footageWarnings = search.warnings;
   run.footageSummary = search.summary;
-  run.preselectedIds = quote ? [pickQuoteImage(search.candidates)?.id].filter(Boolean) : [];
+  run.preselectedIds = quote ? pickQuoteImages(search.candidates).map(image => image.id) : [];
   run.status = 'footage_review';
   run.step = `Chờ chọn footage · ${run.candidates.length} clip gợi ý`;
   run.progress = 0.64;
@@ -942,8 +1001,9 @@ async function retrySession(id) {
       } else if (outputName || child.status === 'done') {
         run.status = 'done'; run.progress = 1;
         run.step = outputName ? 'Video đã hoàn tất · kiểm tra trạng thái đăng trong Thư viện' : 'Video đã hoàn tất';
-      } else if (spec && (spec.backgroundImage || (Array.isArray(spec.backgroundClips) && spec.backgroundClips.length)) &&
-        (await Promise.all([...(spec.backgroundImage ? [spec.backgroundImage] : []), ...(spec.backgroundClips || [])].map(async clip => {
+      } else if (spec && ((Array.isArray(spec.backgroundImages) && spec.backgroundImages.length > 0) || spec.backgroundImage ||
+          (Array.isArray(spec.backgroundClips) && spec.backgroundClips.length)) &&
+        (await Promise.all([...(spec.backgroundImages || []), ...(spec.backgroundImage ? [spec.backgroundImage] : []), ...(spec.backgroundClips || [])].map(async clip => {
           if (typeof clip !== 'string') return false;
           const file = path.resolve(publicDir, clip);
           if (!file.startsWith(publicDir + path.sep)) return false;
@@ -1124,6 +1184,7 @@ const server = createServer(async (req, res) => {
       await sendFile(res, path.join(webDir, name), type);
       return;
     }
+    if (await handleLuxuryRequest(req, res, url, {json, body, sendFile, runId, downloadSlots, renderSlots})) return;
     if (req.method === 'GET' && /^\/fonts\/[a-z0-9-]+\.woff2$/.test(url.pathname)) {
       await sendFile(res, path.join(webDir, url.pathname), 'font/woff2');
       return;
@@ -1140,23 +1201,27 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && url.pathname.startsWith('/music/')) {
-      const name = decodeURIComponent(url.pathname.slice('/music/'.length));
-      const track = (await listMusicTracks()).find(item => item.name === name);
+      const parts = /^\/music\/(ranking|quote|luxury)\/(.+)$/.exec(url.pathname);
+      if (!parts) { json(res, 404, {error: 'Không tìm thấy bài nhạc.'}); return; }
+      const kind = parts[1];
+      const name = decodeURIComponent(parts[2]);
+      const track = (await listMusicTracks(kind)).find(item => item.name === name);
       if (!track) { json(res, 404, {error: 'Không tìm thấy bài nhạc.'}); return; }
       const type = name.toLowerCase().endsWith('.wav') ? 'audio/wav'
         : name.toLowerCase().endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg';
-      await sendFile(res, path.join(publicDir, name), type, req.headers.range);
+      await sendFile(res, path.join(publicDir, `${kind}-music`, name), type, req.headers.range);
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/music') {
-      json(res, 200, {tracks: await listMusicTracks()});
+      const kind = url.searchParams.get('kind') || 'ranking';
+      json(res, 200, {tracks: await listMusicTracks(kind)});
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/music') {
       if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ thêm nhạc từ giao diện ứng dụng.'}); return; }
       const name = req.headers['x-file-name'];
       if (typeof name !== 'string' || name.length > 300) throw new Error('Tên file nhạc không hợp lệ.');
-      json(res, 201, {track: await uploadMusic(req, decodeURIComponent(name))});
+      json(res, 201, {track: await uploadMusic(req, decodeURIComponent(name), url.searchParams.get('kind') || 'ranking')});
       return;
     }
     const musicMatch = /^\/api\/music\/(.+)$/.exec(url.pathname);
@@ -1164,16 +1229,46 @@ const server = createServer(async (req, res) => {
       if (!localDeletionRequest(req)) { json(res, 403, {error: 'Chỉ sửa kho nhạc từ giao diện ứng dụng.'}); return; }
       const name = decodeURIComponent(musicMatch[1]);
       if (req.method === 'DELETE') {
-        await deleteMusic(name);
+        await deleteMusic(name, url.searchParams.get('kind') || 'ranking');
         json(res, 200, {deleted: name});
       } else {
         const {weight} = await body(req);
-        json(res, 200, {track: await setMusicWeight(name, weight)});
+        json(res, 200, {track: await setMusicWeight(name, weight, url.searchParams.get('kind') || 'ranking')});
       }
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/quote-images') {
       json(res, 200, {images: await listQuoteImages()});
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/quote-knowledge') {
+      json(res, 200, {items: await listQuoteKnowledge(), categories: quoteCategories});
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/quote-knowledge') {
+      if (!sameUiOrigin(req)) { json(res, 403, {error: 'Chỉ thêm triết lý từ giao diện ứng dụng.'}); return; }
+      const input = await body(req);
+      const categories = parseQuoteCategories(input.categories || []);
+      const added = await addQuoteKnowledge(parseKnowledgeBatch(input.items), categories);
+      json(res, 201, {added, items: await listQuoteKnowledge()});
+      return;
+    }
+    const quoteKnowledgeMatch = /^\/api\/quote-knowledge\/([a-f0-9-]{36})$/.exec(url.pathname);
+    if (quoteKnowledgeMatch && ['PATCH', 'DELETE'].includes(req.method)) {
+      if (!sameUiOrigin(req)) { json(res, 403, {error: 'Chỉ sửa kho triết lý từ giao diện ứng dụng.'}); return; }
+      const id = quoteKnowledgeMatch[1];
+      if (req.method === 'DELETE') {
+        if (!await deleteQuoteKnowledge(id)) { json(res, 404, {error: 'Mục triết lý không còn trong kho.'}); return; }
+        json(res, 200, {deleted: id});
+      } else {
+        const input = await body(req);
+        const content = normalizeKnowledgeContent(input.content);
+        const categories = parseQuoteCategories(input.categories ||
+          (await quoteKnowledgeById(id))?.categories || [], {allowEmpty: false});
+        const item = await updateQuoteKnowledge(id, content, categories);
+        if (!item) { json(res, 404, {error: 'Mục triết lý không còn trong kho.'}); return; }
+        json(res, 200, {item});
+      }
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/quote-images') {
@@ -1217,7 +1312,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/config') {
       json(res, 200, {aiConfigured: aiConfig().configured, aiProvider: aiConfig().provider,
         providers: configuredProviders(), model: aiConfig().model,
-        musicCount: (await listMusic()).length, concurrency});
+        musicCount: (await listMusic(url.searchParams.get('kind') || 'ranking')).length, concurrency});
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/posts/config') {
@@ -1273,6 +1368,10 @@ const server = createServer(async (req, res) => {
       if (missing.length) throw new Error(`Thiếu cấu hình: ${missing.map(key => platformNames[key]).join(', ')}.`);
       const existing = await activePostForOutput(outputName, Object.keys(targets));
       if (existing) throw new Error(`Video này đã có lượt đăng đang chờ hoặc đã xuất bản (${existing.id}). Kiểm tra trạng thái trước khi đăng lại.`);
+      const interrupted = await interruptedPlatformsForOutput(outputName, Object.keys(targets));
+      if (interrupted.length && input.confirmInterrupted !== true) {
+        throw new Error(`Hãy kiểm tra ${interrupted.map(key => platformNames[key]).join(', ')} chưa có bài đăng rồi xác nhận trước khi thử lại.`);
+      }
       for (const [platform, options] of Object.entries(targets)) {
         if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error(`Tùy chọn ${platform} không hợp lệ.`);
         if (typeof options.caption === 'string') options.caption = withoutSourceAppendix(options.caption);
@@ -1297,11 +1396,13 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/recoverable') {
-      json(res, 200, {runs: await recoverableRuns()});
+      const kind = url.searchParams.get('kind');
+      json(res, 200, {runs: (await recoverableRuns()).filter(run => !kind || run.template === kind)});
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/outputs') {
-      json(res, 200, {outputs: await listVideos()});
+      const kind = url.searchParams.get('kind');
+      json(res, 200, {outputs: (await listVideos()).filter(item => !kind || item.template === kind)});
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/jobs') {
@@ -1309,7 +1410,8 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/sessions') {
-      json(res, 200, {sessions: await listSessions()});
+      const kind = url.searchParams.get('kind');
+      json(res, 200, {sessions: (await listSessions()).filter(session => !kind || session.template === kind)});
       return;
     }
     const deleteSessionMatch = /^\/api\/sessions\/(\d{4}-\d{2}-\d{2}T[\d-]+Z)$/.exec(url.pathname);
@@ -1349,7 +1451,8 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/super-auto') {
-      const campaigns = await listSuperCampaigns();
+      const kind = url.searchParams.get('kind');
+      const campaigns = (await listSuperCampaigns()).filter(campaign => !kind || campaign.template === kind);
       json(res, 200, {campaigns: campaigns.map(publicCampaign)});
       return;
     }
@@ -1357,11 +1460,11 @@ const server = createServer(async (req, res) => {
       if (!sameUiOrigin(req)) {
         json(res, 403, {error: 'Super Auto chỉ nhận yêu cầu từ giao diện ứng dụng.'}); return;
       }
-      if ((await activeSuperCampaigns()).length) throw new Error('Hãy dừng chiến dịch Super Auto đang chạy trước.');
       const input = await body(req);
       const plan = validateSuperPlan(input);
       const autoSettings = await validateAutoSettings(input.auto, await postConfig(), tiktokCreator);
-      const campaign = await createSuperCampaign({...plan, id: randomUUID(), autoSettings});
+      const campaign = await createSuperCampaign({...plan, id: randomUUID(), autoSettings,
+        itemIds: plan.publishTimes.map(() => randomUUID())});
       void tickSuperAuto();
       json(res, 201, {campaign: (({autoSettings, ...visible}) => visible)(campaign)});
       return;
@@ -1433,13 +1536,38 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/ideas') {
       const input = await body(req);
-      const prompt = String(input.prompt || '').trim();
-      if (prompt.length < 3 || prompt.length > 300) throw new Error('Chủ đề cần từ 3 đến 300 ký tự.');
       const template = input.template === 'quote' ? 'quote' : 'ranking';
       const mode = template === 'quote' ? String(input.mode || '') : null;
       if (template === 'quote' && !['onscreen', 'caption'].includes(mode)) throw new Error('Hãy chọn một chế độ Quote.');
-      const run = await createIdeas(prompt, template, mode);
-      json(res, 200, {runId: run.id, ideas: run.ideas, run: publicRun(run)});
+      let prompt = String(input.prompt || '').trim();
+      let source = null;
+      let sources = [];
+      let knowledge = {};
+      if (template === 'quote' && Array.isArray(input.categories)) {
+        const categories = parseQuoteCategories(input.categories);
+        sources = await pickQuoteKnowledgeBatch(categories);
+        if (!sources.length) throw new Error('Không có ý đủ nội dung trong các mảng đã chọn. Hãy thêm ý mới hoặc chọn mảng khác.');
+        const labels = (categories.length ? quoteCategories.filter(item => categories.includes(item.id)) : quoteCategories)
+          .map(item => item.label);
+        prompt = `Các góc nhìn ngẫu nhiên về ${labels.join(', ')}`;
+        knowledge = {categories: labels, sources: sources.map(item => ({content: item.content,
+          categories: item.categories.map(id => quoteCategories.find(category => category.id === id)?.label || id)}))};
+      } else if (template === 'quote' && input.knowledgeId) {
+        source = await quoteKnowledgeById(String(input.knowledgeId));
+        if (!source) throw new Error('Mục triết lý đã chọn không còn trong kho. Hãy tải lại kho.');
+        prompt = source.content;
+      } else if (template === 'quote' && !prompt) {
+        source = await pickQuoteKnowledge();
+        if (!source) throw new Error('Kho triết lý đang trống. Hãy thêm ít nhất một mục trước khi tạo ngẫu nhiên.');
+        prompt = source.content;
+      }
+      if (!sources.length && !source && (prompt.length < 3 || prompt.length > 300)) throw new Error('Chủ đề cần từ 3 đến 300 ký tự.');
+      if (template === 'quote' && !sources.length) knowledge = {
+        source: source?.content || null, examples: await sampleQuoteKnowledge(source?.id),
+      };
+      const run = await createIdeas(prompt, template, mode, knowledge);
+      json(res, 200, {runId: run.id, ideas: run.ideas, run: publicRun(run),
+        knowledgeSource: source, knowledgeSources: sources});
       return;
     }
     const queueMatch = /^\/api\/runs\/([^/]+)\/queue$/.exec(url.pathname);
@@ -1474,9 +1602,9 @@ const server = createServer(async (req, res) => {
       const input = await body(req);
       const ids = Array.isArray(input.ids) ? input.ids.map(String) : [];
       const minimum = run.template === 'quote' ? 1 : 8;
-      const maximum = run.template === 'quote' ? 1 : 20;
+      const maximum = run.template === 'quote' ? run.candidates.length : 20;
       if (ids.length < minimum || ids.length > maximum || new Set(ids).size !== ids.length) {
-        throw new Error(run.template === 'quote' ? 'Hãy chọn đúng một ảnh Quote.' : `Hãy chọn từ ${minimum} đến 20 clip khác nhau.`);
+        throw new Error(run.template === 'quote' ? 'Hãy chọn ít nhất một ảnh Quote trong kho; mỗi ảnh chỉ chọn một lần.' : `Hãy chọn từ ${minimum} đến 20 clip khác nhau.`);
       }
       const selected = ids.map(id => run.candidates.find(candidate => candidate.id === id));
       if (selected.some(candidate => !candidate)) throw new Error('Có tài nguyên không thuộc danh sách gợi ý hiện tại.');
@@ -1551,6 +1679,7 @@ const server = createServer(async (req, res) => {
 });
 
 try {
+  await seedBundledMedia();
   await initDatabase();
   const seeded = await seedExistingOutputs();
   server.listen(port, host, () => {

@@ -19,7 +19,7 @@ export function publishConfig() {
   for (const platform of Object.keys(platformNames)) {
     if (zernioApiKey(platform) && (platform !== 'facebook' || !direct.facebook.configured)) {
       direct[platform] = {provider: 'zernio', configured: true,
-        requirement: `${platform === 'youtube' && process.env.ZERNIO_YOUTUBE_API_KEY ? 'ZERNIO_YOUTUBE_API_KEY' : 'ZERNIO_API_KEY'} và tài khoản đã kết nối trong Zernio`};
+        requirement: 'API key Zernio và tài khoản đã kết nối trong Zernio'};
     }
   }
   return direct;

@@ -1,5 +1,35 @@
 # AI Video Studio
 
+## Life Luxury (30 giây)
+
+Mở `/luxury` từ Menu tổng. Trang này dựng **The Billionaire Lifestyle** thành video dọc
+1080 × 1920 gồm 8 cảnh: xe sang (2 cảnh), private jet, superyacht, mansion,
+luxury watch và skyline về đêm (2 cảnh). Video chỉ hiển thị footage, không có tiêu đề,
+caption hay số cảnh trên khung hình. Remotion cắt cảnh đều trong 30 giây, thêm tiếng
+chuyển cảnh nhẹ, phát nhạc xuyên suốt và giảm âm ở cuối.
+
+1. Tải nhiều MP4 vào **Kho footage Luxury**, chọn nhóm xe sang, jet, yacht, mansion,
+   đồng hồ hoặc skyline. Mỗi clip dài ít nhất 3,8 giây và tối đa 500 MB. Xe sang và
+   skyline cần tối thiểu 2 clip khác nhau vì mỗi nhóm xuất hiện hai lần.
+2. Bấm **Tạo bộ footage từ kho**. Mỗi video chọn ngẫu nhiên 8 clip khác nhau từ kho
+   riêng và ưu tiên tránh clip vừa dùng. Video Luxury mới không tự tìm stock footage.
+3. Tải bản **Cherry Lady không lời** (MP3, WAV hoặc M4A) mà bạn có quyền sử dụng
+   lên kho nhạc Luxury riêng, rồi chọn bản nhạc trong menu.
+4. Sửa caption bài đăng nếu cần; nội dung này không hiện trong video. Bấm **Render
+   Life Luxury**. Video hoàn tất có thể xem, tải xuống và tìm lại trong phần
+   **Video Luxury đã tạo**.
+
+Mỗi bộ footage tạo ra một phiên Luxury riêng. Clip đã chọn, caption bài đăng và nhạc được
+lưu tự động; mở lại ở **Phiên Luxury đã lưu** sau khi tải lại trang hoặc khởi động lại
+ứng dụng. Nếu app dừng giữa lúc render, phiên trở về bản nháp để bạn kiểm tra và
+render lại. Các MP4 đã hoàn tất vẫn nằm ở **Video Luxury đã tạo**.
+
+Trang Luxury chỉ render khi đủ 8 clip khác nhau và một bản nhạc được chọn. Kho footage
+riêng lưu tại `public/luxury-footage/`; kho nhạc
+Luxury lưu riêng tại `public/luxury-music/`; nhạc Ranking và Quote không xuất hiện
+trong menu này. Nếu một nhóm chỉ có số clip tối thiểu, footage có thể lặp giữa các video
+cho đến khi bạn tải thêm.
+
 ## Lưu media trên Cloudflare R2
 
 Ứng dụng hỗ trợ Cloudflare R2 qua API tương thích S3. Video mới được upload lên R2 ngay sau khi render và vẫn có thể xem, tải hoặc đăng từ Thư viện nếu bản local đã được dọn. Bucket có thể để private vì trình duyệt đọc video qua server ứng dụng.
@@ -44,7 +74,7 @@ Trang `/flow` nhận nhiều ảnh quần áo cho một đợt và dùng credit 
 
 Flow dùng credit của tài khoản Google. Theo [bảng credit hiện tại của Google](https://support.google.com/flow/answer/16526234?hl=en), tài khoản nhận 50 credit hằng ngày; gói Google AI Pro có thêm 1.000 credit mỗi tháng. Veo 3.1 Lite dùng 10 credit mỗi đoạn; chỉnh video với Gemini Omni dùng 40 credit mỗi lần. App không tự mua credit. Kiểm tra số credit và giá hiện trên Flow trước khi chạy, vì Google có thể thay đổi chúng.
 
-Local tool tạo video dọc bằng **Gemini qua OmniRouter hoặc Google AI Studio + Remotion**. Ranking dùng nguồn stock MP4 cùng dữ liệu có nguồn; Quote nguyên bản dùng một ảnh upload từ kho riêng, hook ngắn trên video và nội dung đầy đủ ở caption. Font tiếng Việt được đóng gói local. PostgreSQL lưu tiến độ job và trạng thái đăng của từng video.
+Local tool tạo video dọc bằng **Gemini qua OmniRouter hoặc Google AI Studio + Remotion**. Ranking dùng nguồn stock MP4 cùng dữ liệu có nguồn; Quote nguyên bản dùng nhiều ảnh upload từ kho riêng, hook ngắn trên video và nội dung đầy đủ ở caption. Font tiếng Việt được đóng gói local. PostgreSQL lưu tiến độ job và trạng thái đăng của từng video.
 
 ## Chạy Node trực tiếp (tùy chọn)
 
@@ -65,7 +95,7 @@ npm run db:seed
 
 Lệnh trên chỉ mở PostgreSQL trên `127.0.0.1:5433`; dữ liệu nằm trong Docker volume `ai-video-studio_video_studio_pgdata`. `npm run web` yêu cầu PostgreSQL sẵn sàng. Lệnh seed có thể chạy lại mà không tạo bản ghi trùng. Khi chạy Node trên host, đặt `OMNIROUTER_GEMINI_BASE_URL=http://localhost:20128/v1beta` nếu OmniRouter cũng chạy trên host.
 
-Đặt `AI_PROVIDER=omnirouter` và điền `OMNIROUTER_API_KEY`, `OMNIROUTER_GEMINI_BASE_URL` trong `.env`; địa chỉ mặc định của OmniRoute local là `http://localhost:20128/v1beta`. Ranking dùng `OMNIROUTER_SEARCH_MODEL` và `OMNIROUTER_MODEL` với `antigravity/gemini-3.7-flash-tiered`; Quote dùng `OMNIROUTER_QUOTE_MODEL` với cùng model để viết caption tự nhiên và đa dạng hơn. Ứng dụng gọi Chat Completions của OmniRoute, tạo truy vấn tìm kiếm rồi lấy kết quả qua `/v1/search`; nếu OmniRoute trả danh sách rỗng, ứng dụng dùng kết quả Bing công khai làm dự phòng. Có thể đổi sang Google AI Studio bằng `AI_PROVIDER=gemini`; các biến `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_SEARCH_MODEL`, `GEMINI_QUOTE_MODEL` được giữ riêng để có thể đổi lại. Điền thêm ít nhất một key footage (`PIXABAY_API_KEY` hoặc `COVERR_API_KEY`; `PEXELS_API_KEY` chỉ dùng được nếu đã có key từ trước). Nếu bước Ranking không xác nhận được lượt tìm kiếm web, workflow dừng. API key chỉ nằm ở server local. Đặt nhạc `.mp3`, `.wav` hoặc `.m4a` trong `public/`. Công cụ tạo 16 truy vấn footage cho Ranking, tìm ứng viên từ các API đã cấu hình và chờ duyệt trước khi tải clip gốc. Kết quả tìm kiếm stock được cache 24 giờ trong `.cache/stock/`.
+Đặt `AI_PROVIDER=omnirouter` và điền `OMNIROUTER_API_KEY`, `OMNIROUTER_GEMINI_BASE_URL` trong `.env`; địa chỉ mặc định của OmniRoute local là `http://localhost:20128/v1beta`. Ranking dùng `OMNIROUTER_SEARCH_MODEL` và `OMNIROUTER_MODEL` với `antigravity/gemini-3.8-flash-tiered`; Quote dùng `OMNIROUTER_QUOTE_MODEL` với cùng model để viết caption tự nhiên và đa dạng hơn. Khi model cấu hình không còn trong live catalog, ứng dụng đọc `/v1/models` và thử lại một lần với Gemini Flash mới nhất của Antigravity. Ứng dụng gọi Chat Completions của OmniRoute, tạo truy vấn tìm kiếm rồi lấy kết quả qua `/v1/search`; nếu OmniRoute trả danh sách rỗng, ứng dụng dùng kết quả Bing công khai làm dự phòng. Có thể đổi sang Google AI Studio bằng `AI_PROVIDER=gemini`; các biến `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_SEARCH_MODEL`, `GEMINI_QUOTE_MODEL` được giữ riêng để có thể đổi lại. Điền thêm ít nhất một key footage (`PIXABAY_API_KEY` hoặc `COVERR_API_KEY`; `PEXELS_API_KEY` chỉ dùng được nếu đã có key từ trước). Nếu bước Ranking không xác nhận được lượt tìm kiếm web, workflow dừng. API key chỉ nằm ở server local. Đặt nhạc `.mp3`, `.wav` hoặc `.m4a` trong `public/`. Công cụ tạo 16 truy vấn footage cho Ranking, tìm ứng viên từ các API đã cấu hình và chờ duyệt trước khi tải clip gốc. Kết quả tìm kiếm stock được cache 24 giờ trong `.cache/stock/`.
 
 Kiểm tra Remotion không cần API key: `npm run smoke`. Lệnh tạo `.tmp/smoke.png` và `.tmp/smoke.mp4` từ dữ liệu mẫu có ghi rõ là demo.
 
@@ -83,7 +113,9 @@ Trong **Tổng quan → Phiên sản xuất**, mở một phiên rồi chọn **
 npm run web
 ```
 
-Mở `http://127.0.0.1:4173`. Chọn Ranking hoặc Quote, nhập chủ đề, chọn nhiều ý tưởng rồi theo dõi hàng chờ. Quote tạo đúng 8 phương án, dài khoảng 30–40 giây theo nhạc được chọn. Chữ trên ảnh mở thẳng bằng “Đừng”, “Không”, một động từ mạnh hoặc “5 điều phải biết”; câu ngắn, sắc, không hỏi, xưng hô trực tiếp hay bịa số liệu. Caption gồm đúng 5 ý đánh số. Ranking dùng footage MP4; Quote dùng một ảnh từ kho riêng cho mỗi video. Mặc định hai video được chuẩn bị song song, nhưng Remotion chỉ render một video tại một thời điểm; một video lỗi không chặn video tiếp theo. Server chỉ nghe trên máy local; API key không được gửi xuống trình duyệt.
+Mở `http://127.0.0.1:4173`. Ranking nhận chủ đề bạn nhập; Quote cho chọn một hoặc nhiều mảng nội dung rồi tự rút ý ngẫu nhiên từ kho để tạo 8 phương án. Bạn cũng có thể không chọn mảng nào để lấy từ toàn bộ kho. Chọn các ý tưởng muốn làm video rồi theo dõi hàng chờ. Quote dài khoảng 30–40 giây theo nhạc được chọn. Chữ trên ảnh mở thẳng bằng “Đừng”, “Không”, một động từ mạnh hoặc “5 điều phải biết”; câu ngắn, sắc, không hỏi, xưng hô trực tiếp hay bịa số liệu. Caption gồm đúng 5 ý đánh số. Ranking dùng footage MP4; Quote thủ công dùng số ảnh tùy chọn từ kho riêng và tự chuyển ảnh theo thời lượng video. Mặc định hai video được chuẩn bị song song, nhưng Remotion chỉ render một video tại một thời điểm; một video lỗi không chặn video tiếp theo. Server chỉ nghe trên máy local; API key không được gửi xuống trình duyệt.
+
+Trong khu Quote, **Kho triết lý Quote** lưu các quote, quy tắc và chủ đề bạn dán vào (mỗi dòng một ý). Có thể tìm, sửa, xóa và gắn một hoặc nhiều mảng nội dung cho mỗi ý; khi thêm mà không chọn mảng, ứng dụng tự phân loại. Mỗi lần bấm **Tạo 8 Quote ngẫu nhiên**, ứng dụng chọn tối đa 8 ý đủ nội dung trong các mảng đã chọn, ưu tiên ý ít dùng gần đây và phân bổ giữa các mảng. Gemini học hạt nhân và văn phong từ các ý đó rồi diễn đạt lại hook và caption. Các dòng quá ngắn vẫn được lưu làm ghi chú, nhưng không dùng làm nguồn tạo Quote. Super Auto Quote cũng lấy ý từ kho. Kho được lưu trong PostgreSQL. Để nạp từ công cụ khác, gửi JSON `{"items":["ý thứ nhất", "ý thứ hai"]}` tới `POST /api/quote-knowledge` trên server local (tối đa 100 mục mỗi lần); có thể kèm `"categories":["kinh_doanh","quan_ly"]` để gắn cùng các mảng cho cả lô.
 
 **Giới hạn song song:** `MAX_CONCURRENT_JOBS`, `MAX_CONCURRENT_RENDERS`, `MAX_CONCURRENT_DOWNLOADS` và `MAX_CONCURRENT_PUBLISHES` trong `.env` điều khiển từng nhóm tài nguyên. Mặc định `2 / 1 / 2 / 2`, phù hợp NucBox G3 Plus 8 GB: hai video có thể nghiên cứu hoặc tải footage đồng thời, còn render được khóa ở một lượt để tránh thiếu RAM và tranh CPU. Giá trị sai hoặc nhỏ hơn 1 tự trở về mặc định; server cũng đặt trần an toàn cho từng biến.
 
@@ -94,6 +126,10 @@ Mở `http://127.0.0.1:4173`. Chọn Ranking hoặc Quote, nhập chủ đề, c
 **Auto mode:** Bật công tắc tại trang Tự động hóa, chọn nền tảng, tài khoản và quyền riêng tư rồi xác nhận đồng ý đăng tự động. Nhập chủ đề để tạo ý tưởng, sau đó **tự chọn video muốn đăng ở bước 2** và bấm **Bắt đầu tự động**. Chỉ những video đã chọn mới vào hàng chờ; từ đó hệ thống tự chọn footage phù hợp, tải clip, render và gửi từng video lên các nền tảng đã chọn, không chờ duyệt footage, video hoặc caption. Nếu không đủ clip, job dừng và báo lỗi để bạn chạy thủ công và bổ sung MP4. Kết quả hiển thị trạng thái đăng riêng cho từng nền tảng; có thể cập nhật trạng thái xử lý sau khi tải lên. Auto mode mặc định tắt.
 
 **Super Auto:** Bật Auto mode, chọn nền tảng/tài khoản, rồi ở phần Super Auto chọn giờ đăng bài đầu tiên, khoảng cách tối thiểu giữa các bài (15 phút–7 ngày) và đồng ý cho hệ thống tự chọn chủ đề. Có thể nhập định hướng chủ đề hoặc để trống. Bấm **Bắt đầu Super Auto** để chạy liên tục cho đến khi bấm **Dừng Super Auto**. Hệ thống tìm chủ đề mới, tạo ý tưởng, chọn ý tưởng đầu, lấy footage và render trước; bài chỉ được gửi khi đến giờ. Sau mỗi lượt gửi, hệ thống chuẩn bị video kế tiếp và giữ khoảng cách tối thiểu tính từ lúc bắt đầu lượt gửi trước. Chiến dịch, lịch và trạng thái từng bài được lưu trong PostgreSQL; lịch tiếp tục sau khi khởi động lại server. Khi video lỗi vì thiếu clip phù hợp, nút **Bổ sung footage** mở đúng job ở bước Chọn footage để upload MP4 và tiếp tục render; nếu chiến dịch còn chạy, video trở lại lịch đăng ban đầu. Mỗi video lỗi vẫn có nút **Retry video** nếu chưa bắt đầu đăng; nút **Retry tất cả video lỗi** xếp lại toàn bộ video an toàn vào một hàng chờ bền vững và dùng đúng các nền tảng đang chọn. Retry giữ nguyên chủ đề và đưa video trở lại lịch an toàn. Video đã có lượt đăng không được Retry tự động để tránh đăng trùng. Nếu server dừng đúng lúc đang gửi bài, chiến dịch tạm dừng để bạn kiểm tra trên nền tảng rồi bấm **Đã kiểm tra, tiếp tục**. Sau ba lượt lỗi liên tiếp, chiến dịch cũng tạm dừng để bạn kiểm tra cấu hình. Windows Task Scheduler khởi chạy lại server khi đăng nhập; máy cần bật, đăng nhập và không ngủ để đăng đúng giờ. Quote tự chọn chủ đề bằng AI; Ranking tìm chủ đề bằng web search rồi kiểm tra số liệu khi tạo video.
+
+Chiến dịch Super Auto mới có hạn mức 1–30 video. Chọn số lượng, mốc bắt đầu và khoảng cách để điền lịch gợi ý, sau đó sửa giờ đăng riêng của từng video. Các mốc phải tăng dần, cách nhau ít nhất khoảng cách đã chọn và nằm trong 90 ngày tới. Hệ thống tạo lần lượt tất cả video trong chiến dịch, kể cả khi video trước đang chờ giờ đăng; khi hết lịch, chiến dịch tự chuyển sang **Hoàn tất**. Mốc đăng là giờ sớm nhất có thể gửi: nếu render hoặc lượt đăng trước kết thúc muộn, video sẽ đăng sau mốc đó khi đã sẵn sàng. Các chiến dịch cũ không có hạn mức vẫn chạy theo lịch lặp trước đây.
+
+Có thể chạy nhiều chiến dịch Super Auto cùng lúc, kể cả cùng kiểu video. Mỗi chiến dịch giữ lịch, lỗi và thao tác dừng riêng. Các lượt chuẩn bị, render, tải footage và đăng bài chia sẻ giới hạn đồng thời trong `.env`; khi nhiều video cùng đến giờ, lượt sau có thể bắt đầu muộn do hàng chờ tài nguyên.
 
 Khi mở giao diện qua IP LAN hoặc tên miền HTTPS của reverse proxy, Super Auto và các thao tác đăng bài chấp nhận yêu cầu từ chính địa chỉ đang mở (header `Host` phải được proxy giữ nguyên). Nếu cho truy cập từ Internet, đặt xác thực ở reverse proxy vì ứng dụng không có hệ thống đăng nhập riêng. Server và PostgreSQL vẫn cần chạy liên tục để giữ lịch đăng.
 
@@ -109,7 +145,7 @@ Supervisor tách riêng stdout/stderr nên cảnh báo nguồn hoặc Remotion k
 - Video mới dùng một hook khoảng 125–180 ký tự trong khối màu đỏ ở phần dưới ảnh, đủ nội dung để đọc khoảng 5 giây. Hook nêu tình huống và hệ quả bằng giọng đời thường; phần triển khai vẫn ở caption.
 - Caption 550–1500 ký tự chứa đúng 5 ý đánh số, mỗi ý một đoạn riêng. Tùy chủ đề, bài viết theo dạng quy tắc ứng xử, phân tích trách nhiệm hoặc cặp ưu tiên “A > B”; có hành vi, tình huống, hệ quả cụ thể và câu chốt rõ. Video không hiện lời nhắc đọc caption.
 - Quote không dùng web search hay API stock. Tải ảnh JPG, PNG hoặc WebP (tối đa 20 MB/ảnh) vào **Kho ảnh Quote**; ảnh được lưu trong `public/quote-images/` và dùng lại ở các phiên sau.
-- Mỗi video Quote chọn ngẫu nhiên đúng một ảnh. Ở chế độ thủ công có thể đổi ảnh trước khi render; Auto mode tự dùng ảnh đã chọn. Nếu kho trống, hãy upload ảnh trước khi tạo video.
+- Video Quote thủ công cho phép chọn một hoặc nhiều ảnh khác nhau, không giới hạn số ảnh trong kho. Video tự chia đều thời lượng và chuyển qua các ảnh theo thứ tự chọn. Auto mode chọn ngẫu nhiên hai ảnh; kho cần ít nhất hai ảnh để chạy Auto mode.
 - Ảnh mở từ nền gần đen, hơi mờ và zoom nhẹ; trong khoảng một giây ảnh sáng và nét dần. Suốt video, ảnh trôi và zoom rất chậm dưới một vùng sáng mềm chuyển động nhẹ. Hook xuất hiện sau nhịp mở ảnh.
 - Nhạc Quote được chọn khi chuẩn bị video. Nếu bản nhạc dài hơn 40 giây, hệ thống chọn điểm kết dịu trong khoảng 30–40 giây và fade âm thanh; nhạc 30–40 giây dùng gần trọn đoạn, nhạc ngắn hơn được lặp đến mốc 30 giây. Không có nhạc thì video dài 35 giây.
 
@@ -148,6 +184,8 @@ Nếu đã khởi động lại server, tải lại trang rồi chọn MP4 trong
 **Qua Zernio (khuyên dùng):** điền `ZERNIO_API_KEY=sk_...` vào `.env` theo [.env.example](.env.example), rồi khởi động lại server. Với nền tảng chưa kết nối, bấm **Kết nối … qua Zernio** ngay trong ứng dụng; sau khi cấp quyền và chọn Facebook Page trên Zernio, trình duyệt quay lại ứng dụng và làm mới danh sách tài khoản. Giao diện lấy tài khoản và quyền riêng tư TikTok từ Zernio, upload MP4 qua URL tạm do Zernio cấp, sau đó đăng bằng `POST /v1/posts`. Chỉ các nền tảng đã kết nối mới có thể chọn. Nếu API key có nhiều hồ sơ mà không có hồ sơ mặc định, đặt `ZERNIO_PROFILE_ID`. Khóa Zernio không phải `TIKTOK_ACCESS_TOKEN`; biến đó dành riêng cho TikTok OAuth token của tích hợp trực tiếp.
 
 **Tài khoản Zernio thứ hai:** đặt `ZERNIO_YOUTUBE_API_KEY=sk_...` trong `.env` để dùng kênh YouTube ở tài khoản đó. Ứng dụng cũng hiển thị các Facebook Page hoặc tài khoản TikTok được kết nối dưới key này cùng với tài khoản ở `ZERNIO_API_KEY`; khi đăng, ứng dụng dùng đúng key của tài khoản đã chọn cho cả upload và kiểm tra trạng thái. Nếu tài khoản Zernio thứ hai có nhiều hồ sơ mà không có hồ sơ mặc định, đặt thêm `ZERNIO_YOUTUBE_PROFILE_ID` để kết nối YouTube từ ứng dụng. Khởi động lại server rồi tải lại trang để cập nhật danh sách tài khoản.
+
+**Kênh YouTube tiếp theo:** đặt `ZERNIO_YOUTUBE_API_KEY2=sk_...` trong `.env`. Các kênh hoạt động từ cả ba API key sẽ xuất hiện chung trong danh sách chọn kênh; upload, đăng bài và kiểm tra trạng thái dùng API key của kênh đã chọn. Khởi động lại server rồi tải lại trang để cập nhật danh sách.
 
 **Qua API trực tiếp (tùy chọn):** Facebook dùng Meta Graph API trực tiếp khi có `FACEBOOK_PAGE_ACCESS_TOKEN` và chưa kết nối Facebook trong Zernio; khi đã kết nối Fanpage qua Zernio, ứng dụng ưu tiên tài khoản Zernio. TikTok và YouTube dùng API trực tiếp khi không cấu hình Zernio:
 
@@ -188,7 +226,7 @@ Zernio: [TikTok creator info và đăng bài](https://docs.zernio.com/platforms/
 
 ## Duyệt footage
 
-Ranking dừng ở trạng thái **Chọn footage** và cho phép chọn 8–20 clip. Nếu chưa đủ clip phù hợp, dùng **Thêm MP4 local** (tối đa 100 MB/file); clip này chỉ thuộc job hiện tại. Quote dừng ở bước chọn một ảnh từ kho riêng và có thể upload thêm ảnh ngay tại đó. Các job khác vẫn tiếp tục tới bước duyệt. API key luôn ở server local; trình duyệt chỉ nhận link xem trước qua proxy.
+Ranking dừng ở trạng thái **Chọn footage** và cho phép chọn 8–20 clip. Nếu chưa đủ clip phù hợp, dùng **Thêm MP4 local** (tối đa 100 MB/file); clip này chỉ thuộc job hiện tại. Quote dừng ở bước chọn ảnh từ kho riêng, cho phép chọn tùy ý hoặc upload thêm ảnh ngay tại đó. Các job khác vẫn tiếp tục tới bước duyệt. API key luôn ở server local; trình duyệt chỉ nhận link xem trước qua proxy.
 
 Ba nguồn có thể tìm tự động: [Pixabay](https://pixabay.com/api/docs/), [Pexels](https://www.pexels.com/api/documentation/) và [Coverr](https://api.coverr.co/docs/start/). Điền key tương ứng trong .env và khởi động lại server. Pexels đang tạm dừng cấp key mới; Coverr là tùy chọn; nếu chỉ có Pixabay, công cụ vẫn hiển thị mọi clip phù hợp để chọn. Xem [danh mục 32 nguồn footage](STOCK_SOURCES.md) để lấy clip thủ công hoặc cân nhắc tích hợp thêm.
 

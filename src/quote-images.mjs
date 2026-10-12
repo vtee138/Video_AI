@@ -25,8 +25,11 @@ export async function listQuoteImages() {
   }))).filter(item => item.size > 0).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function pickQuoteImage(images, pickIndex = randomInt) {
-  return images.length ? images[pickIndex(images.length)] : null;
+export function pickQuoteImages(images, count = 2, pickIndex = randomInt) {
+  const pool = [...images];
+  const picked = [];
+  while (pool.length && picked.length < count) picked.push(pool.splice(pickIndex(pool.length), 1)[0]);
+  return picked;
 }
 
 export async function uploadQuoteImage(req) {
@@ -57,14 +60,15 @@ export async function deleteQuoteImage(id) {
   await unlink(path.join(imageDir, id));
 }
 
-export async function copyQuoteImage(id, runId) {
+export async function copyQuoteImage(id, runId, index = 1) {
   if (!imageName.test(id) || !/^\d{4}-\d{2}-\d{2}T[\d-]+Z-q\d+$/.test(runId)) {
     throw new Error('Ảnh hoặc phiên Quote không hợp lệ.');
   }
   const extension = path.extname(id);
   const destinationDir = path.join(publicDir, 'runs', runId);
   await mkdir(destinationDir, {recursive: true});
-  const destination = path.join(destinationDir, `quote-image${extension}`);
+  if (!Number.isInteger(index) || index < 1) throw new Error('Thứ tự ảnh Quote không hợp lệ.');
+  const destination = path.join(destinationDir, `quote-image-${index}${extension}`);
   await copyFile(path.join(imageDir, id), destination);
-  return `runs/${runId}/quote-image${extension}`;
+  return `runs/${runId}/quote-image-${index}${extension}`;
 }

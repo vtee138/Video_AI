@@ -7,6 +7,17 @@ import '@fontsource/be-vietnam-pro/700.css';
 import '@fontsource/be-vietnam-pro/800.css';
 
 const sceneFrames = 45;
+const cutJolts = {
+  '-3': [-9, 4, 1.09, -.35],
+  '-2': [13, -7, 1.13, .55],
+  '-1': [-6, 3, 1.08, -.25],
+  0: [22, -12, 1.22, .9],
+  1: [-18, 9, 1.18, -.75],
+  2: [11, -6, 1.15, .45],
+  3: [-7, 4, 1.12, -.3],
+  4: [4, -2, 1.1, .15],
+  5: [-2, 1, 1.08, 0],
+};
 
 function QuoteFootage({src, index, occurrence}) {
   const frame = useCurrentFrame();
@@ -19,23 +30,29 @@ function QuoteFootage({src, index, occurrence}) {
       filter: 'brightness(.98) saturate(1.04) contrast(1.08)'}} />;
 }
 
-function CinematicBackground({clips = [], image}) {
+function CinematicBackground({clips = [], images = []}) {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
   const count = Math.ceil(durationInFrames / sceneFrames);
   const reveal = interpolate(frame, [0, 36], [0, 1], {extrapolateRight: 'clamp'});
-  const imageScale = interpolate(frame, [0, 42, durationInFrames], [1.17, 1.055, 1.095],
-    {extrapolateRight: 'clamp'});
-  const driftX = Math.sin(frame / 115) * 17;
-  const driftY = Math.sin(frame / 155) * 12;
-  const glowX = Math.sin(frame / 125) * 170;
-  const glowY = Math.cos(frame / 180) * 80;
+  const imageFrames = durationInFrames / Math.max(1, images.length);
+  const boundaries = Array.from({length: Math.max(0, images.length - 1)}, (_, index) => Math.round((index + 1) * imageFrames));
+  const nextBoundary = boundaries.findIndex((boundary) => frame < boundary);
+  const currentImage = nextBoundary < 0 ? images.length - 1 : nextBoundary;
+  const nearestCut = boundaries.reduce((nearest, boundary, index) => {
+    const distance = Math.abs(frame - boundary);
+    return distance < nearest.distance ? {distance, offset: frame - boundary, index} : nearest;
+  }, {distance: Infinity, offset: Infinity, index: 0});
+  const jolt = cutJolts[nearestCut.offset] || [0, 0, 1.07, 0];
+  const direction = nearestCut.index % 2 ? -1 : 1;
   const lightPass = interpolate(frame, [8, 22, 42, 58], [0, .22, .12, 0],
     {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   return <AbsoluteFill style={{background: 'linear-gradient(145deg,#171a22,#050608)'}}>
-    {image ? <Img src={staticFile(image)} style={{width: '100%', height: '100%', objectFit: 'cover',
-      transform: `translate3d(${driftX}px,${driftY}px,0) scale(${imageScale})`, transformOrigin: '50% 44%',
-      filter: frame < 36 ? `blur(${(1 - reveal) * 9}px)` : undefined}} />
+    {images.length ? <Img src={staticFile(images[currentImage])}
+      style={{position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+        transform: `translate3d(${jolt[0] * direction}px,${jolt[1]}px,0) scale(${jolt[2]}) rotate(${jolt[3] * direction}deg)`,
+        transformOrigin: '50% 44%',
+        filter: frame < 36 ? `blur(${(1 - reveal) * 9}px)` : undefined}} />
       : clips.length > 0 && Array.from({length: count}, (_, index) => (
       <Sequence key={index} from={index * sceneFrames}
         durationInFrames={Math.min(sceneFrames, durationInFrames - index * sceneFrames)}>
@@ -43,13 +60,14 @@ function CinematicBackground({clips = [], image}) {
           occurrence={Math.floor(index / clips.length)} />
       </Sequence>
     ))}
-    {image ? <>
+    {images.length ? <>
+      {images.length > 1 && <AbsoluteFill style={{background: '#f5f0e5',
+        opacity: nearestCut.offset === 0 ? .28 : nearestCut.offset === 1 ? .08 : 0}} />}
       <AbsoluteFill style={{background: '#03060a', opacity: interpolate(frame, [0, 8, 36],
         [.96, .82, .16], {extrapolateRight: 'clamp'})}} />
       <AbsoluteFill style={{background: 'linear-gradient(180deg,rgba(1,3,7,.25),transparent 39%,rgba(1,3,7,.45))'}} />
       <AbsoluteFill style={{background: 'radial-gradient(ellipse at 50% 43%,transparent 24%,rgba(1,3,7,.4) 100%)'}} />
-      <AbsoluteFill style={{background: 'radial-gradient(ellipse 78% 63% at 48% 42%,rgba(215,229,245,.2),transparent 70%)',
-        transform: `translate3d(${glowX}px,${glowY}px,0)`, opacity: .21}} />
+      <AbsoluteFill style={{background: 'radial-gradient(ellipse 78% 63% at 48% 42%,rgba(215,229,245,.2),transparent 70%)', opacity: .21}} />
       <AbsoluteFill style={{background: 'linear-gradient(108deg,transparent 27%,rgba(224,233,244,.22) 48%,transparent 67%)',
         opacity: lightPass,
         transform: `translateX(${interpolate(frame, [8, 58], [-95, 95],
@@ -74,27 +92,28 @@ function QuoteMark() {
 export function QuoteVideo({spec}) {
   const frame = useCurrentFrame();
   const {durationInFrames} = useVideoConfig();
-  const enter = interpolate(frame, spec.backgroundImage ? [22, 46] : [0, 14], [0, 1],
+  const images = spec.backgroundImages?.length ? spec.backgroundImages : (spec.backgroundImage ? [spec.backgroundImage] : []);
+  const enter = interpolate(frame, images.length ? [22, 46] : [0, 14], [0, 1],
     {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   const exit = interpolate(frame, [durationInFrames - 18, durationInFrames - 2], [1, 0],
     {extrapolateLeft: 'clamp'});
   const visible = Math.min(enter, exit);
   const text = spec.mode === 'caption' ? spec.hookText : spec.quoteText;
   const length = text.length;
-  const fontSize = spec.mode === 'caption' ? (length > 175 ? 39 : length > 145 ? 42 : length > 115 ? 44 : 48)
+  const fontSize = spec.mode === 'caption' ? (length > 175 ? 34 : length > 145 ? 37 : length > 115 ? 40 : 43)
     : length > 270 ? 43 : length > 210 ? 48 : length > 150 ? 54 : 62;
   return <AbsoluteFill style={{fontFamily: '"Be Vietnam Pro", Arial, sans-serif', color: '#fffdf7'}}>
-    <CinematicBackground clips={spec.backgroundClips} image={spec.backgroundImage} />
+    <CinematicBackground clips={spec.backgroundClips} images={images} />
     {spec.musicPath && <Audio src={staticFile(spec.musicPath)} loop
       volume={(audioFrame) => .22 * Math.max(0, Math.min(1, audioFrame / 18,
         (durationInFrames - audioFrame) / 45))} />}
 
-    {spec.mode === 'caption' ? <div style={{position: 'absolute', left: 65, right: 65, bottom: 370,
-      display: 'flex', justifyContent: 'center', opacity: visible,
+    {spec.mode === 'caption' ? <div style={{position: 'absolute', left: 54, bottom: 300, width: 620,
+      opacity: visible,
       transform: `translateY(${(1 - enter) * 18}px)`}}>
-      <div style={{width: '100%', padding: '25px 31px', borderRadius: 10,
+      <div style={{width: '100%', boxSizing: 'border-box', padding: '22px 25px', borderRadius: 9,
         background: 'rgba(211,56,61,.94)', boxShadow: '0 12px 30px rgba(0,0,0,.27)',
-        color: '#fff', textAlign: 'center', fontSize, lineHeight: 1.25,
+        color: '#fff', textAlign: 'left', fontSize, lineHeight: 1.22,
         fontWeight: 700, letterSpacing: '-.7px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
         textShadow: '0 1px 2px rgba(0,0,0,.2)'}}>{text}</div>
     </div> : <div style={{position: 'absolute', left: 70, right: 148, top: 270, bottom: 330,

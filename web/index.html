@@ -11,7 +11,7 @@
 <body>
   <div class="app-shell" data-page="overview">
     <header class="topbar">
-      <a class="brand" href="/" data-page="overview" aria-label="AI Video Studio — Tổng quan">
+      <a class="brand" href="/" data-page="home" aria-label="AI Video Studio — Menu tổng">
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 28 28"><path d="M5 21V9h4v12M12 21V4h4v17M19 21v-8h4v8"/><path d="M3 24h22"/></svg>
         </span>
@@ -35,10 +35,13 @@
 
     <aside class="workflow" aria-label="Điều hướng chính">
       <nav class="primary-nav" aria-label="Các trang">
-        <a href="/" data-page="overview" class="primary-link active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10 12 3l9 7v10H3V10Z"/><path d="M9 20v-6h6v6"/></svg></span><span>Tổng quan</span></a>
+        <a href="/" data-page="home" class="primary-link active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10 12 3l9 7v10H3V10Z"/><path d="M9 20v-6h6v6"/></svg></span><span>Menu tổng</span></a>
+        <a href="/ranking" data-workspace="ranking" class="primary-link workspace-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19h14M7 16h3V9H7zM11 16h3V5h-3zM15 16h3v-5h-3z"/></svg></span><span>Ranking</span></a>
+        <a href="/quote" data-workspace="quote" class="primary-link workspace-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h6v6H7l-2 4V7Zm9 0h6v6h-4l-2 4V7Z"/></svg></span><span>Quote</span></a>
+        <a href="/luxury" data-workspace="luxury" class="primary-link workspace-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 17h18M5 17l3-7 4 4 4-7 3 10M7 20h10"/></svg></span><span>Life Luxury</span></a>
         <a href="/create" data-page="create" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="m10 9 5 3-5 3V9Z"/></svg></span><span>Tạo video</span></a>
         <a href="/automation" data-page="automation" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M18.4 5.6l-2.1 2.1m-8.6 8.6-2.1 2.1"/><circle cx="12" cy="12" r="4"/></svg></span><span>Tự động hóa</span></a>
-        <a href="/flow" data-page="flow" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14v18H5zM8 16l3-3 2 2 3-4 2 2"/></svg></span><span>Thử đồ Flow</span></a>
+        <a href="/flow" data-page="flow" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14v18H5zM8 16l3-3 2 2 3-4 2 2"/></svg></span><span>Flow</span></a>
         <a href="/publishing" data-page="publishing" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M5 14v6h14v-6"/></svg></span><span>Xuất bản</span></a>
         <a href="/library" data-page="library" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/></svg></span><span>Thư viện</span></a>
         <a href="/music" data-page="music" class="primary-link"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg></span><span>Kho nhạc</span></a>
@@ -50,7 +53,7 @@
       </div>
       <button class="workflow-step active" data-stage="topic" type="button">
         <span class="step-marker">1</span>
-        <span><strong>Thiết lập</strong><small>Chọn kiểu và chủ đề</small></span>
+        <span><strong>Thiết lập</strong><small>Nhập chủ đề video</small></span>
       </button>
       <button class="workflow-step" data-stage="ideas" type="button" disabled>
         <span class="step-marker">2</span>
@@ -95,7 +98,17 @@
         <button type="button" id="dismissZernioNotice" aria-label="Đóng thông báo">×</button>
       </div>
 
-      <section class="page" id="page-overview">
+      <section class="page" id="page-home">
+        <div class="video-type-intro"><h2>Chọn dạng video</h2><p>Mỗi khu có quy trình, tài nguyên và phiên làm việc riêng.</p></div>
+        <div class="video-type-list">
+          <a href="/ranking" data-workspace="ranking"><span class="video-type-symbol" aria-hidden="true">01</span><span><strong>Ranking</strong><small>Bảng xếp hạng, số liệu, footage và nhạc riêng.</small></span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+          <a href="/quote" data-workspace="quote"><span class="video-type-symbol" aria-hidden="true">02</span><span><strong>Quote</strong><small>Nội dung nguyên bản, kho ảnh và nhạc riêng.</small></span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+          <a href="/luxury"><span class="video-type-symbol" aria-hidden="true">03</span><span><strong>Life Luxury</strong><small>Footage từ kho riêng, chọn ngẫu nhiên; video không có chữ trên hình.</small></span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+          <a href="/flow" data-page="flow"><span class="video-type-symbol" aria-hidden="true">04</span><span><strong>Flow</strong><small>Thử đồ, ảnh tham chiếu và các đợt tạo video riêng.</small></span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+        </div>
+      </section>
+
+      <section class="page" id="page-overview" hidden>
         <div class="overview-intro">
           <div><h2>Hôm nay bạn muốn làm gì?</h2><p>Từ một chủ đề, chọn ý tưởng, duyệt ảnh hoặc footage rồi xuất video. Các tác vụ tự động và video đã tạo có khu vực riêng.</p></div>
           <button id="startNewButton" type="button" class="button primary">Tạo video mới <span aria-hidden="true">→</span></button>
@@ -173,7 +186,7 @@
         <section class="super-auto" aria-labelledby="superAutoHeading">
           <div class="super-auto-heading">
             <h2 id="superAutoHeading">Super Auto</h2>
-            <p>Tự tìm chủ đề mới, sản xuất video và đăng liên tục theo khoảng cách bạn đặt. Bật Auto mode và chọn tài khoản ở phía trên trước khi chạy.</p>
+            <p>Đặt số video và giờ đăng cho từng bài. Hệ thống chuẩn bị lần lượt toàn bộ video trước giờ đăng. Bật Auto mode và chọn tài khoản ở phía trên trước khi chạy.</p>
           </div>
           <div class="super-auto-grid">
             <label class="publish-field">Kiểu video
@@ -182,7 +195,10 @@
             <label class="publish-field">Định hướng chủ đề (không bắt buộc)
               <input id="superFocus" type="text" maxlength="300" placeholder="Ví dụ: kinh tế và đời sống tại Việt Nam">
             </label>
-            <label class="publish-field">Giờ đăng bài đầu tiên
+            <label class="publish-field">Số video trong chiến dịch
+              <input id="superVideoLimit" type="number" min="1" max="30" step="1" value="5" required>
+            </label>
+            <label class="publish-field">Mốc bắt đầu để điền lịch
               <input id="superStartAt" type="datetime-local" required>
             </label>
             <label class="publish-field">Khoảng cách tối thiểu giữa các bài
@@ -195,7 +211,9 @@
               </select>
             </label>
           </div>
-          <label class="auto-consent"><input id="superConsent" type="checkbox"> Tôi đồng ý để Super Auto tự chọn chủ đề, tạo và đăng các video tiếp theo lên nền tảng đã chọn cho đến khi tôi dừng chiến dịch.</label>
+          <div class="super-schedule-heading"><div><h3>Lịch đăng từng video</h3><p>Giờ cụ thể là mục tiêu đăng. Nếu video chưa sẵn sàng hoặc nền tảng xử lý lâu, bài sẽ được gửi khi có thể.</p></div><button class="mini-button" id="superFillSchedule" type="button">Điền theo khoảng cách</button></div>
+          <div class="super-schedule" id="superSchedule"></div>
+          <label class="auto-consent"><input id="superConsent" type="checkbox"> Tôi đồng ý để Super Auto tự chọn chủ đề, tạo và đăng số video trong lịch này lên nền tảng đã chọn.</label>
           <div class="super-auto-actions"><button class="button primary" id="superStartButton" type="button">Bắt đầu Super Auto</button><span>Server cần tiếp tục chạy để đăng đúng lịch.</span></div>
           <div class="super-auto-campaigns" id="superCampaigns"></div>
         </section>
@@ -279,7 +297,7 @@
 
       <section class="page" id="page-publishing" hidden>
         <div class="page-lead publishing-lead">
-          <div><h2>Theo dõi xuất bản</h2><p>Mỗi hàng là một video. Chọn Đăng ở nền tảng chưa đăng hoặc Thử lại khi lượt đăng gặp lỗi.</p></div>
+          <div><h2>Theo dõi xuất bản</h2><p>Mỗi hàng là một video. Chọn Đăng ở nền tảng chưa đăng hoặc Thử lại khi lượt đăng có lỗi hay cần kiểm tra.</p></div>
           <button class="button ghost compact" id="refreshPublishing" type="button">Cập nhật trạng thái</button>
         </div>
         <div class="publishing-summary" aria-label="Tổng quan xuất bản">
@@ -304,7 +322,7 @@
 
       <section class="stage" id="stage-topic" hidden>
         <div class="template-picker" aria-labelledby="templateHeading">
-          <div class="quick-heading"><div><h2 id="templateHeading">Chọn kiểu video</h2><p>Mỗi kiểu dùng chung hàng chờ và bước đăng.</p></div></div>
+          <div class="quick-heading"><div><h2 id="templateHeading">Dạng video hiện tại</h2><p>Quay lại Menu tổng để chuyển sang dạng video khác.</p></div></div>
           <div class="template-grid" role="radiogroup" aria-label="Kiểu video">
             <button class="template-card selected" type="button" role="radio" aria-checked="true" data-template="ranking">
               <span class="template-icon" aria-hidden="true">01</span>
@@ -321,12 +339,27 @@
           <div class="quick-heading"><div><h2>Hook trên ảnh · 5 ý ở caption</h2><p>Ảnh giữ sự chú ý; caption triển khai đúng 5 ý sắc gọn, cụ thể.</p></div></div>
           <div class="quote-library">
             <div class="quote-library-head">
-              <div><h3>Kho ảnh Quote</h3><p>Mỗi video dùng ngẫu nhiên một ảnh trong kho. Ảnh được giữ lại cho các lần tạo sau.</p></div>
+              <div><h3>Kho ảnh Quote</h3><p>Chọn nhiều ảnh tùy ý cho video thủ công; video tự chia đều thời lượng và chuyển ảnh. Ảnh được giữ lại cho các lần tạo sau.</p></div>
               <label class="button ghost compact" for="quoteImageInput">Upload ảnh</label>
               <input id="quoteImageInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
             </div>
             <p id="quoteImageCount" class="quote-library-count" aria-live="polite">Đang tải kho ảnh…</p>
             <div id="quoteImageList" class="quote-library-list"></div>
+          </div>
+          <div class="quote-knowledge">
+            <div class="quote-knowledge-head">
+              <div><h3>Kho triết lý Quote</h3><p>Dán quote, góc nhìn hoặc chủ đề; mỗi dòng là một mục. Kho được lưu lại để dùng cho các video sau.</p></div>
+              <span id="quoteKnowledgeCount" aria-live="polite">Đang tải…</span>
+            </div>
+            <form id="quoteKnowledgeForm" class="quote-knowledge-form">
+              <label for="quoteKnowledgeInput">Thêm vào kho</label>
+              <textarea id="quoteKnowledgeInput" rows="3" maxlength="15000" placeholder="Mỗi dòng một ý triết lý hoặc chủ đề muốn khai thác"></textarea>
+              <fieldset class="quote-category-field quote-category-field-small"><legend>Gắn mảng cho ý mới</legend><p>Không chọn: tự phân loại theo nội dung.</p><div id="quoteKnowledgeCategoryOptions" class="quote-category-options"></div></fieldset>
+              <div class="quote-knowledge-actions"><span id="quoteKnowledgeStatus" role="status"></span><button class="button ghost compact" type="submit">Lưu vào kho</button></div>
+            </form>
+            <label class="quote-knowledge-search" for="quoteKnowledgeSearch">Tìm trong kho<input id="quoteKnowledgeSearch" type="search" placeholder="Tìm theo câu chữ hoặc chủ đề"></label>
+            <div id="quoteKnowledgeList" class="quote-knowledge-list" aria-label="Các ý trong kho triết lý"></div>
+            <p id="quoteKnowledgeMore" class="quote-knowledge-more" hidden></p>
           </div>
         </div>
 
@@ -337,7 +370,13 @@
 
         <form id="topicForm" class="topic-form">
           <label for="topicInput" id="topicLabel">Chủ đề video</label>
-          <div class="prompt-box">
+          <fieldset id="quoteCategoryPicker" class="quote-category-field" hidden>
+            <legend>Chọn mảng để tạo Quote ngẫu nhiên</legend>
+            <p>Chọn một hoặc nhiều mảng. Không chọn mảng nào thì hệ thống lấy ý từ toàn bộ kho.</p>
+            <div id="quoteCategoryOptions" class="quote-category-options"></div>
+            <p id="quoteCategoryStatus" class="quote-category-status" aria-live="polite">Đang tải kho triết lý…</p>
+          </fieldset>
+          <div class="prompt-box" id="rankingPromptBox">
             <textarea id="topicInput" name="prompt" rows="4" maxlength="300"
               placeholder="Ví dụ: Các quốc gia có dân số lớn nhất hiện nay" required></textarea>
             <div class="prompt-footer">
@@ -348,8 +387,9 @@
               </button>
             </div>
           </div>
+          <div class="quote-create-action" id="quoteCreateAction" hidden><button class="button primary" id="quoteIdeaButton" type="submit">Tạo 8 Quote ngẫu nhiên</button></div>
         </form>
-        <div class="quick-start">
+        <div class="quick-start" id="quickStart">
           <div class="quick-heading">
             <h2 id="quickTitle">Bắt đầu nhanh</h2>
             <p id="quickDescription">Chọn một chủ đề, sau đó sửa lại theo ý bạn.</p>
@@ -517,6 +557,10 @@
               </label>
               <label><input type="checkbox" id="youtubeMadeForKids"> Nội dung dành cho trẻ em</label>
               <label><input type="checkbox" id="youtubeSynthetic"> Có hình ảnh/âm thanh tổng hợp trông như thật</label>
+            </div>
+            <div class="publish-interrupted-check" id="publishInterruptedCheck" hidden>
+              <p>Lượt tải lên trước bị gián đoạn. Bài đăng có thể đã xuất hiện sau khi server dừng.</p>
+              <label><input type="checkbox" id="publishInterruptedConsent"> Tôi đã kiểm tra <span id="publishInterruptedPlatforms"></span> và chưa thấy video này được đăng.</label>
             </div>
             <label class="publish-consent"><input type="checkbox" id="publishConsent" required> Tôi đã xem video, kiểm tra caption và đồng ý đăng lên các nền tảng đã chọn.</label>
             <p class="publish-error" id="publishError" role="alert" hidden></p>

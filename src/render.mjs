@@ -32,7 +32,7 @@ export async function stageRenderAssets(spec, runId) {
   const stagingDir = path.join(root, '.tmp', runId, 'remotion-public');
   await rm(stagingDir, {recursive: true, force: true});
   await mkdir(stagingDir, {recursive: true});
-  const assets = [...new Set([...(spec.backgroundClips || []), spec.backgroundImage, spec.musicPath].filter(Boolean))];
+  const assets = [...new Set([...(spec.backgroundClips || []), ...(spec.backgroundImages || []), spec.backgroundImage, spec.musicPath, spec.sfxPath].filter(Boolean))];
   for (const asset of assets) await stageAsset(asset, stagingDir);
   return stagingDir;
 }
@@ -52,7 +52,7 @@ export async function renderVideo(spec, runId, onProgress, {cancelSignal} = {}) 
   let serveUrl;
   try {
     serveUrl = await bundle({entryPoint: path.join(root, 'remotion', 'index.jsx'), publicDir: stagingDir});
-    const compositionId = spec.type === 'quote' ? 'QuoteVideo' : 'RankingVideo';
+    const compositionId = spec.type === 'quote' ? 'QuoteVideo' : spec.type === 'luxury' ? 'LuxuryVideo' : 'RankingVideo';
     const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || undefined;
     const composition = await selectComposition({serveUrl, id: compositionId, inputProps: {spec}, browserExecutable});
     for (let attempt = 1; attempt <= 2; attempt++) {

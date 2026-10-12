@@ -18,6 +18,7 @@ COPY public ./public
 COPY assets/music ./assets/music
 COPY flow-extension ./flow-extension
 COPY migrations ./migrations
+COPY seed ./seed
 
 RUN mkdir -p output .tmp .cache public/runs public/quote-images assets/flow-tryon
 

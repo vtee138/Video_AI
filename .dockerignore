@@ -7,5 +7,6 @@ node_modules
 output
 public/runs
 public/quote-images
+public/.bundled-media-seed-v1
 assets/flow-tryon
 *.log

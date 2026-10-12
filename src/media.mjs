@@ -1,5 +1,5 @@
 import {createWriteStream} from 'node:fs';
-import {mkdir, open, readFile, readdir, rename, stat, unlink, writeFile} from 'node:fs/promises';
+import {copyFile, mkdir, open, readFile, readdir, rename, stat, unlink, writeFile} from 'node:fs/promises';
 import {randomInt, randomUUID} from 'node:crypto';
 import {Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
@@ -8,22 +8,61 @@ import {promisify} from 'node:util';
 import path from 'node:path';
 import {publicDir, root} from './common.mjs';
 
-const musicStateFile = path.join(root, '.tmp', 'music-selection.json');
-const musicLibraryFile = path.join(root, '.tmp', 'music-library.json');
 const musicName = /^[^\\/\x00-\x1f<>:"|?*]+\.(mp3|wav|m4a)$/i;
-let musicSelectionQueue = Promise.resolve();
-let musicLibraryQueue = Promise.resolve();
+const musicKinds = new Set(['ranking', 'quote', 'luxury']);
+const selectionQueues = new Map();
+const libraryQueues = new Map();
+let migration;
 const execFileAsync = promisify(execFile);
 
-export async function listMusic() {
-  return (await readdir(publicDir, {withFileTypes: true}))
+function musicKind(kind) {
+  if (!musicKinds.has(kind)) throw new Error('Kiểu kho nhạc không hợp lệ.');
+  return kind;
+}
+
+const musicDir = kind => path.join(publicDir, `${musicKind(kind)}-music`);
+const selectionFile = kind => path.join(root, '.tmp', `music-selection-${musicKind(kind)}.json`);
+const libraryFile = kind => path.join(root, '.tmp', `music-library-${musicKind(kind)}.json`);
+
+async function ensureMusicLibraries() {
+  if (!migration) migration = (async () => {
+    await Promise.all([...musicKinds].map(kind => mkdir(musicDir(kind), {recursive: true})));
+    const legacy = (await readdir(publicDir, {withFileTypes: true}))
+      .filter(entry => entry.isFile() && musicName.test(entry.name));
+    for (const kind of musicKinds) {
+      const marker = path.join(musicDir(kind), '.migrated-v2');
+      try { await stat(marker); continue; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      for (const entry of kind === 'luxury' ? [] : legacy) {
+        const target = path.join(musicDir(kind), entry.name);
+        try { await stat(target); } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          await copyFile(path.join(publicDir, entry.name), target);
+        }
+      }
+      const oldWeights = path.join(root, '.tmp', 'music-library.json');
+      try { await stat(libraryFile(kind)); } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        if (kind !== 'luxury') {
+          try { await copyFile(oldWeights, libraryFile(kind)); }
+          catch (copyError) { if (copyError.code !== 'ENOENT') throw copyError; }
+        }
+      }
+      await writeFile(marker, 'v2');
+    }
+  })().catch(error => { migration = null; throw error; });
+  return migration;
+}
+
+export async function listMusic(kind = 'ranking') {
+  await ensureMusicLibraries();
+  return (await readdir(musicDir(kind), {withFileTypes: true}))
     .filter(entry => entry.isFile() && musicName.test(entry.name))
     .map(entry => entry.name).sort((a, b) => a.localeCompare(b, 'vi'));
 }
 
-async function readWeights() {
+async function readWeights(kind) {
   try {
-    const data = JSON.parse(await readFile(musicLibraryFile, 'utf8'));
+    const data = JSON.parse(await readFile(libraryFile(kind), 'utf8'));
     return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
   } catch (error) {
     if (error.code === 'ENOENT') return {};
@@ -35,12 +74,12 @@ function validWeight(value) {
   return Number.isInteger(value) && value >= 0 && value <= 10;
 }
 
-export async function listMusicTracks() {
-  const [names, weights] = await Promise.all([listMusic(), readWeights()]);
+export async function listMusicTracks(kind = 'ranking') {
+  const [names, weights] = await Promise.all([listMusic(kind), readWeights(kind)]);
   return Promise.all(names.map(async name => {
-    const info = await stat(path.join(publicDir, name));
+    const info = await stat(path.join(musicDir(kind), name));
     return {name, weight: validWeight(weights[name]) ? weights[name] : 1,
-      size: info.size, url: `/music/${encodeURIComponent(name)}`};
+      size: info.size, url: `/music/${kind}/${encodeURIComponent(name)}`};
   }));
 }
 
@@ -59,19 +98,20 @@ export function selectWeightedMusic(tracks, previousName = '', pickIndex = size 
   throw new Error('Giá trị chọn nhạc không hợp lệ.');
 }
 
-export async function chooseMusic() {
-  const selection = musicSelectionQueue.then(async () => {
-    const tracks = await listMusicTracks();
+export async function chooseMusic(kind = 'ranking') {
+  musicKind(kind);
+  const selection = (selectionQueues.get(kind) || Promise.resolve()).then(async () => {
+    const tracks = await listMusicTracks(kind);
     let state = {};
-    try { state = JSON.parse(await readFile(musicStateFile, 'utf8')); }
+    try { state = JSON.parse(await readFile(selectionFile(kind), 'utf8')); }
     catch { /* First selection or stale state. */ }
     const name = selectWeightedMusic(tracks, state.last);
     if (!name) return null;
-    await mkdir(path.dirname(musicStateFile), {recursive: true});
-    await writeFile(musicStateFile, JSON.stringify({last: name, selectedAt: new Date().toISOString()}, null, 2));
-    return {path: name, original: name};
+    await mkdir(path.dirname(selectionFile(kind)), {recursive: true});
+    await writeFile(selectionFile(kind), JSON.stringify({last: name, selectedAt: new Date().toISOString()}, null, 2));
+    return {path: `${kind}-music/${name}`, original: name};
   });
-  musicSelectionQueue = selection.catch(() => {});
+  selectionQueues.set(kind, selection.catch(() => {}));
   return selection;
 }
 
@@ -99,7 +139,8 @@ export function quietQuoteEnding(pcm, sampleRate = 8000) {
 
 export async function quoteMusicTiming(name) {
   if (!musicName.test(name)) throw new Error('Tên nhạc Quote không hợp lệ.');
-  const file = path.join(publicDir, name);
+  await ensureMusicLibraries();
+  const file = path.join(musicDir('quote'), name);
   const probe = await execFileAsync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration',
     '-of', 'default=noprint_wrappers=1:nokey=1', file], {timeout: 15000});
   const seconds = Number(String(probe.stdout).trim());
@@ -116,40 +157,41 @@ export async function quoteMusicTiming(name) {
   }
 }
 
-function queueLibraryChange(change) {
-  const result = musicLibraryQueue.then(change);
-  musicLibraryQueue = result.catch(() => {});
+function queueLibraryChange(kind, change) {
+  const result = (libraryQueues.get(kind) || Promise.resolve()).then(change);
+  libraryQueues.set(kind, result.catch(() => {}));
   return result;
 }
 
-async function saveWeights(weights) {
-  await mkdir(path.dirname(musicLibraryFile), {recursive: true});
-  const temporary = `${musicLibraryFile}.${randomUUID()}.tmp`;
+async function saveWeights(kind, weights) {
+  const file = libraryFile(kind);
+  await mkdir(path.dirname(file), {recursive: true});
+  const temporary = `${file}.${randomUUID()}.tmp`;
   try {
     await writeFile(temporary, JSON.stringify(weights, null, 2));
-    await rename(temporary, musicLibraryFile);
+    await rename(temporary, file);
   } finally { await unlink(temporary).catch(() => {}); }
 }
 
-export async function setMusicWeight(name, weight) {
+export async function setMusicWeight(name, weight, kind = 'ranking') {
   if (!musicName.test(name) || !validWeight(weight)) throw new Error('Tên nhạc hoặc trọng số không hợp lệ (0–10).');
-  return queueLibraryChange(async () => {
-    if (!(await listMusic()).includes(name)) throw new Error('Không tìm thấy bài nhạc.');
-    const weights = await readWeights();
+  return queueLibraryChange(kind, async () => {
+    if (!(await listMusic(kind)).includes(name)) throw new Error('Không tìm thấy bài nhạc.');
+    const weights = await readWeights(kind);
     weights[name] = weight;
-    await saveWeights(weights);
+    await saveWeights(kind, weights);
     return {name, weight};
   });
 }
 
-export async function deleteMusic(name) {
+export async function deleteMusic(name, kind = 'ranking') {
   if (!musicName.test(name)) throw new Error('Tên nhạc không hợp lệ.');
-  return queueLibraryChange(async () => {
-    if (!(await listMusic()).includes(name)) throw new Error('Không tìm thấy bài nhạc.');
-    await unlink(path.join(publicDir, name));
-    const weights = await readWeights();
+  return queueLibraryChange(kind, async () => {
+    if (!(await listMusic(kind)).includes(name)) throw new Error('Không tìm thấy bài nhạc.');
+    await unlink(path.join(musicDir(kind), name));
+    const weights = await readWeights(kind);
     delete weights[name];
-    await saveWeights(weights);
+    await saveWeights(kind, weights);
   });
 }
 
@@ -159,13 +201,13 @@ function audioHeaderMatches(header, extension) {
   return header.toString('ascii', 0, 3) === 'ID3' || (header[0] === 0xff && (header[1] & 0xe0) === 0xe0);
 }
 
-export async function uploadMusic(req, originalName) {
+export async function uploadMusic(req, originalName, kind = 'ranking') {
   const base = path.basename(String(originalName || '').normalize('NFC')).replace(/[\\/\x00-\x1f<>:"|?*]/g, '_').trim();
   if (!musicName.test(base)) throw new Error('Chỉ nhận file MP3, WAV hoặc M4A.');
   const extension = path.extname(base).toLowerCase();
   if (!base.slice(0, -extension.length).trim()) throw new Error('Tên bài nhạc không hợp lệ.');
-  await mkdir(publicDir, {recursive: true});
-  const temporary = path.join(publicDir, `${randomUUID()}.upload`);
+  await ensureMusicLibraries();
+  const temporary = path.join(musicDir(kind), `${randomUUID()}.upload`);
   let size = 0;
   try {
     await pipeline(req, new Transform({transform(chunk, _encoding, callback) {
@@ -177,13 +219,13 @@ export async function uploadMusic(req, originalName) {
     const header = Buffer.alloc(12);
     try { await handle.read(header, 0, 12, 0); } finally { await handle.close(); }
     if (!audioHeaderMatches(header, extension)) throw new Error('Nội dung file không khớp định dạng nhạc.');
-    return await queueLibraryChange(async () => {
-      const existing = new Set((await listMusic()).map(name => name.toLocaleLowerCase('vi')));
+    return await queueLibraryChange(kind, async () => {
+      const existing = new Set((await listMusic(kind)).map(name => name.toLocaleLowerCase('vi')));
       const stem = base.slice(0, -extension.length).slice(0, 150);
       let name = `${stem}${extension}`;
       for (let number = 2; existing.has(name.toLocaleLowerCase('vi')); number++) name = `${stem} (${number})${extension}`;
-      await rename(temporary, path.join(publicDir, name));
-      return {name, weight: 1, size, url: `/music/${encodeURIComponent(name)}`};
+      await rename(temporary, path.join(musicDir(kind), name));
+      return {name, weight: 1, size, url: `/music/${kind}/${encodeURIComponent(name)}`};
     });
   } finally { await unlink(temporary).catch(() => {}); }
 }

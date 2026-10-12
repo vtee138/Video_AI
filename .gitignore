@@ -6,5 +6,10 @@ node_modules/
 output/
 public/runs/
 public/quote-images/
+public/ranking-music/
+public/quote-music/
+public/luxury-music/
+public/luxury-footage/
+public/.bundled-media-seed-v1
 assets/flow-tryon/
 *.log
