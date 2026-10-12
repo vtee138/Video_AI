@@ -28,6 +28,18 @@ test('Super Auto requires one ordered publishing time per video', () => {
     publishTimes: [base.startAt, '2026-10-07T04:30:00.000Z']}, now), /ít nhất 60 phút/);
 });
 
+test('Super Auto Quote keeps a selectable image count of at least two', () => {
+  const now = new Date('2026-10-07T03:00:00.000Z');
+  const base = {template: 'quote', mode: 'caption', intervalMinutes: 60,
+    startAt: '2026-10-07T04:00:00.000Z', videoLimit: 1,
+    publishTimes: ['2026-10-07T04:00:00.000Z']};
+  assert.equal(validateSuperPlan(base, now).quoteImageCount, 2);
+  assert.equal(validateSuperPlan({...base, quoteImageCount: 5}, now).quoteImageCount, 5);
+  for (const count of [1, 31, 2.5, '']) {
+    assert.throws(() => validateSuperPlan({...base, quoteImageCount: count}, now), /2 đến 30/);
+  }
+});
+
 test('Super Auto never schedules sooner than the previous upload gap', () => {
   assert.equal(nextPostAt('2026-10-07T04:00:00.000Z', '2026-10-07T05:10:00.000Z', 60),
     '2026-10-07T06:10:00.000Z');

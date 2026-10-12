@@ -19,6 +19,8 @@ test('kho ảnh Quote lưu lại ảnh và stage mọi ảnh đã chọn cho Rem
     assert.ok((await listQuoteImages()).some(item => item.id === image.id));
     const pair = pickQuoteImages([image, {id: 'second'}], 2, () => 0);
     assert.deepEqual(pair.map(item => item.id), [image.id, 'second']);
+    const four = pickQuoteImages([image, {id: 'second'}, {id: 'third'}, {id: 'fourth'}], 4, () => 0);
+    assert.deepEqual(four.map(item => item.id), [image.id, 'second', 'third', 'fourth']);
     const first = await copyQuoteImage(image.id, runId, 1);
     const second = await copyQuoteImage(image.id, runId, 2);
     const third = await copyQuoteImage(image.id, runId, 3);

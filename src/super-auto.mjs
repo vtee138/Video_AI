@@ -2,6 +2,10 @@ export function validateSuperPlan(input, now = new Date()) {
   const template = input.template === 'quote' ? 'quote' : 'ranking';
   const mode = template === 'quote' ? input.mode : null;
   if (template === 'quote' && !['onscreen', 'caption'].includes(mode)) throw new Error('Hãy chọn chế độ Quote.');
+  const quoteImageCount = template === 'quote' ? Number(input.quoteImageCount ?? 2) : null;
+  if (template === 'quote' && (!Number.isInteger(quoteImageCount) || quoteImageCount < 2 || quoteImageCount > 30)) {
+    throw new Error('Số ảnh mỗi video Quote phải từ 2 đến 30.');
+  }
   const intervalMinutes = Number(input.intervalMinutes);
   if (!Number.isInteger(intervalMinutes) || intervalMinutes < 15 || intervalMinutes > 10080) {
     throw new Error('Khoảng cách đăng phải từ 15 phút đến 7 ngày.');
@@ -32,7 +36,7 @@ export function validateSuperPlan(input, now = new Date()) {
     return date.toISOString();
   });
   if (publishTimes[0] !== start.toISOString()) throw new Error('Giờ video đầu tiên không khớp lịch đăng.');
-  return {template, mode, intervalMinutes, startAt: start.toISOString(), focus, videoLimit, publishTimes};
+  return {template, mode, quoteImageCount, intervalMinutes, startAt: start.toISOString(), focus, videoLimit, publishTimes};
 }
 
 export function nextPostAt(scheduledAt, lastStartedAt, intervalMinutes) {

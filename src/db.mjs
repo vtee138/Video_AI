@@ -203,7 +203,7 @@ export async function updateFlowJob(id, patch) {
 
 const campaignFromRow = row => ({id: row.id, status: row.status, template: row.template, mode: row.mode,
   focus: row.focus, intervalMinutes: row.interval_minutes, nextAt: row.next_at.toISOString(),
-  videoLimit: row.video_limit,
+  videoLimit: row.video_limit, quoteImageCount: row.template === 'quote' ? row.quote_image_count ?? 2 : null,
   readyAfter: row.ready_after.toISOString(), lastStartedAt: row.last_started_at?.toISOString() || null,
   autoSettings: row.auto_settings, error: row.error, createdAt: row.created_at.toISOString(),
   updatedAt: row.updated_at.toISOString()});
@@ -219,10 +219,10 @@ export async function createSuperCampaign(campaign) {
   try {
     await client.query('BEGIN');
     const {rows} = await client.query(`INSERT INTO super_campaigns
-      (id,status,template,mode,focus,interval_minutes,next_at,auto_settings,video_limit)
-      VALUES ($1,'active',$2,$3,$4,$5,$6,$7::jsonb,$8) RETURNING *`,
+      (id,status,template,mode,focus,interval_minutes,next_at,auto_settings,video_limit,quote_image_count)
+      VALUES ($1,'active',$2,$3,$4,$5,$6,$7::jsonb,$8,$9) RETURNING *`,
     [campaign.id, campaign.template, campaign.mode, campaign.focus, campaign.intervalMinutes,
-      campaign.startAt, JSON.stringify(campaign.autoSettings), campaign.videoLimit]);
+      campaign.startAt, JSON.stringify(campaign.autoSettings), campaign.videoLimit, campaign.quoteImageCount]);
     for (const [index, scheduledAt] of campaign.publishTimes.entries()) {
       await client.query(`INSERT INTO super_items (id,campaign_id,slot_index,scheduled_at,status)
         VALUES ($1,$2,$3,$4,'waiting')`, [campaign.itemIds[index], campaign.id, index + 1, scheduledAt]);

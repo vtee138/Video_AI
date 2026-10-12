@@ -258,7 +258,7 @@ const publicQueueItem = (run) => ({
     candidates: run.template === 'quote' ? (run.candidates || []) : (run.candidates || []).map(candidate => publicCandidate(candidate, run.id)),
     warnings: run.footageWarnings || [],
     preselectedIds: run.preselectedIds || [],
-    requiredClips: run.template === 'quote' ? 1 : (run.requiredClips || 8),
+    requiredClips: run.requiredClips || (run.template === 'quote' ? 1 : 8),
   } : null,
 });
 
@@ -308,7 +308,7 @@ async function prepareQuoteRun(run) {
     const music = await chooseMusic('quote');
     const timing = music ? await quoteMusicTiming(music.original) : null;
     run.duration = quoteDuration(timing?.seconds, timing?.quietEnding);
-    run.requiredClips = 1;
+    run.requiredClips = run.quoteImageCount || run.autoSettings?.quoteImageCount || (run.autoSettings ? 2 : 1);
     run.story = {...run.idea, musicPath: music?.path || null};
     run.caption = quoteCaption(run.idea);
     await saveJson(path.join(run.folder, 'quote-spec.json'), {
@@ -317,7 +317,7 @@ async function prepareQuoteRun(run) {
     });
     await writeFile(path.join(run.folder, 'caption.txt'), run.caption, 'utf8');
     run.candidates = await listQuoteImages();
-    run.preselectedIds = pickQuoteImages(run.candidates).map(image => image.id);
+    run.preselectedIds = pickQuoteImages(run.candidates, run.autoSettings ? run.requiredClips : 2).map(image => image.id);
     run.footageWarnings = [];
     run.status = 'footage_review';
     run.step = run.preselectedIds.length ? `Đã chọn ngẫu nhiên ${run.preselectedIds.length} ảnh · chờ duyệt` : 'Kho ảnh trống · hãy upload ảnh Quote';
@@ -544,9 +544,9 @@ async function processQueuedJob(job) {
     if (job.status === 'render_queued') await renderRun(job);
     else if (job.status === 'resume_prepared') {
       if (job.template === 'quote') {
-        job.requiredClips = 1;
+        job.requiredClips = job.quoteImageCount || job.autoSettings?.quoteImageCount || (job.autoSettings ? Math.max(2, job.requiredClips || 2) : 1);
         job.candidates = await listQuoteImages();
-        job.preselectedIds = pickQuoteImages(job.candidates).map(image => image.id);
+        job.preselectedIds = pickQuoteImages(job.candidates, job.autoSettings ? job.requiredClips : 2).map(image => image.id);
         job.footageWarnings = [];
       } else {
         const search = await findFootage(job.story.backgroundQueries);
@@ -565,16 +565,16 @@ async function processQueuedJob(job) {
       if (job.status === 'review') await prepareRun(job);
     }
     if (job.autoSettings && job.status === 'footage_review') {
-      const minimum = job.template === 'quote' ? 2 : 8;
+      const minimum = job.template === 'quote' ? job.requiredClips : 8;
       const selected = job.template === 'quote'
         ? (job.preselectedIds || []).map(id => job.candidates.find(candidate => candidate.id === id)).filter(Boolean)
         : selectAutoFootage(job.candidates || [], job.template, job.requiredClips);
       if (selected.length < minimum) {
         job.status = 'error';
-        job.error = job.template === 'quote' ? 'Kho ảnh Quote cần ít nhất 2 ảnh khác nhau. Hãy upload thêm ảnh rồi chạy lại.'
+        job.error = job.template === 'quote' ? `Kho ảnh Quote cần ít nhất ${minimum} ảnh khác nhau; hiện có ${selected.length}. Hãy upload thêm ảnh rồi chạy lại.`
           : `Chỉ tìm được ${selected.length}/${minimum} clip phù hợp. ` +
             `${job.footageSummary ? `Nguồn: ${job.footageSummary}. ` : ''}Hãy chạy thủ công để bổ sung footage.`;
-        job.step = job.template === 'quote' ? 'Kho ảnh Quote đang trống' : 'Không đủ footage để chạy tự động';
+        job.step = job.template === 'quote' ? 'Không đủ ảnh Quote để chạy tự động' : 'Không đủ footage để chạy tự động';
       } else {
         job.selectedCandidates = selected;
         await saveJson(path.join(job.folder, 'footage-selection.json'),
@@ -657,7 +657,8 @@ async function createQueue(parent, selections, autoInput = null, schedule = null
     const idea = parent.ideas[selection];
     const job = {id, parentId: parent.id, prompt: parent.prompt, template: parent.template || 'ranking',
       mode: parent.mode || null, folder, ideas: [idea], idea,
-      autoSettings,
+      autoSettings: schedule?.quoteImageCount ? {...autoSettings, quoteImageCount: schedule.quoteImageCount} : autoSettings,
+      quoteImageCount: schedule?.quoteImageCount || null,
       superItemId: schedule?.itemId || null,
       scheduledAt: schedule?.scheduledAt || null,
       status: 'queued', step: `Chờ tới lượt ${position + 1}`, progress: 0.02, error: null};
@@ -692,7 +693,7 @@ async function startSuperCycle(campaign, slot = null) {
     const idea = parent.ideas[0];
     if (!idea) throw new Error('Không có ý tưởng phù hợp cho chủ đề mới.');
     const queue = await createQueue(parent, [0], campaign.autoSettings,
-      {itemId: item.id, scheduledAt});
+      {itemId: item.id, scheduledAt, quoteImageCount: campaign.quoteImageCount});
     await updateSuperItem(item.id, {jobId: queue.items[0].id});
   } catch (error) {
     await failSuperItem(item.id, error.message);
@@ -725,7 +726,7 @@ async function retrySuperItem(campaign, item) {
     const idea = parent.ideas[0];
     if (!idea) throw new Error('Không có ý tưởng phù hợp khi Retry video.');
     const queue = await createQueue(parent, [0], campaign.autoSettings,
-      {itemId: item.id, scheduledAt: item.scheduledAt});
+      {itemId: item.id, scheduledAt: item.scheduledAt, quoteImageCount: campaign.quoteImageCount});
     await updateSuperItem(item.id, {jobId: queue.items[0].id});
   } catch (error) {
     await failSuperItem(item.id, error.message);
@@ -908,10 +909,12 @@ async function recoverRun(id, superRecovery = null) {
   const parent = {id: `recover-${id}`, prompt: '', jobIds: [id], status: 'processing'};
   const recoveredIdea = quote || idea;
   const run = {id, parentId: parent.id, folder, template: quote ? 'quote' : 'ranking',
-    mode: quote?.mode || null, duration: quote?.duration || 30, requiredClips: quote ? 1 : 8,
+    mode: quote?.mode || null, duration: quote?.duration || 30,
+    requiredClips: quote ? (superRecovery?.campaign.quoteImageCount || quote.requiredClips || 2) : 8,
     ideas: [recoveredIdea], idea: recoveredIdea, facts, story,
     caption: withoutSourceAppendix(await readFile(path.join(folder, 'caption.txt'), 'utf8').catch(() => '')),
     autoSettings: superRecovery?.campaign.autoSettings || null,
+    quoteImageCount: superRecovery?.campaign.quoteImageCount || null,
     superItemId: superRecovery?.item.id || null,
     scheduledAt: superRecovery?.item.scheduledAt || null,
     manualSuperReview: Boolean(superRecovery),
@@ -929,7 +932,7 @@ async function recoverRun(id, superRecovery = null) {
   run.candidates = search.candidates;
   run.footageWarnings = search.warnings;
   run.footageSummary = search.summary;
-  run.preselectedIds = quote ? pickQuoteImages(search.candidates).map(image => image.id) : [];
+  run.preselectedIds = quote ? pickQuoteImages(search.candidates, run.requiredClips).map(image => image.id) : [];
   run.status = 'footage_review';
   run.step = `Chờ chọn footage · ${run.candidates.length} clip gợi ý`;
   run.progress = 0.64;
@@ -991,8 +994,9 @@ async function retrySession(id) {
       const run = {id: child.run_id, parentId: id, folder: childFolder, prompt: parent.prompt,
         template: child.template, mode: child.mode, ideas: [idea], idea, story, facts,
         caption: await readFile(path.join(childFolder, 'caption.txt'), 'utf8').catch(() => ''),
-        duration: quote?.duration || 30, requiredClips: quote ? 1 : 8,
+        duration: quote?.duration || 30, requiredClips: quote ? (quote.requiredClips || 2) : 8,
         autoSettings: child.auto_settings || null, outputName,
+        quoteImageCount: child.auto_settings?.quoteImageCount || null,
         skipAutoPublish: superJobs.has(child.run_id),
         progress: child.progress || 0, error: null};
       if (child.status === 'error') {

@@ -225,6 +225,7 @@ function selectTemplate(template) {
   state.template = template;
   $('#superTemplate').value = template;
   $('#superTemplate').disabled = true;
+  $('#superQuoteImagesField').hidden = template !== 'quote';
   if (template === 'quote') state.quoteMode = 'caption';
   if (template === 'quote') void loadQuoteImages().catch(showError);
   if (template === 'quote') void loadQuoteKnowledge().catch(showError);
@@ -790,6 +791,7 @@ function renderSuperCampaigns(campaigns) {
       : campaign.status === 'stopped'
         ? `Đã dừng · khoảng cách đã đặt ${campaign.intervalMinutes} phút`
         : `Bài tiếp theo: từ ${superTime(campaign.nextAt)} · cách nhau tối thiểu ${campaign.intervalMinutes} phút`;
+    if (campaign.template === 'quote') detail.textContent += ` · ${campaign.quoteImageCount || 2} ảnh/video`;
     section.append(heading, detail);
     const totals = document.createElement('p');
     const c = campaign.counts;
@@ -2714,6 +2716,7 @@ $('#superStartButton').addEventListener('click', async () => {
     await api('/api/super-auto', {method: 'POST', body: JSON.stringify({
       template: $('#superTemplate').value,
       mode: $('#superTemplate').value === 'quote' ? 'caption' : null,
+      quoteImageCount: $('#superTemplate').value === 'quote' ? Number($('#superQuoteImageCount').value) : null,
       focus: $('#superFocus').value.trim(), startAt: publishTimes[0],
       intervalMinutes: Number($('#superInterval').value),
       videoLimit: Number($('#superVideoLimit').value), publishTimes, auto,
